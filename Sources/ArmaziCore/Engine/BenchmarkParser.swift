@@ -16,20 +16,9 @@ public enum BenchmarkParser {
         return try parse(yaml: content)
     }
 
-    /// Load the bundled benchmark for macOS.
-    public static func loadBundled(named filename: String = "cis-macos-benchmark") throws -> BenchmarkDefinition {
-        guard let url = Bundle.module.url(forResource: filename, withExtension: "yaml", subdirectory: "Benchmarks") else {
-            throw BenchmarkError.bundledFileNotFound(filename)
-        }
-        return try parse(fileURL: url)
-    }
-
-    /// List all bundled benchmark files.
-    public static func listBundled() -> [String] {
-        guard let urls = Bundle.module.urls(forResourcesWithExtension: "yaml", subdirectory: "Benchmarks") else {
-            return []
-        }
-        return urls.map { $0.deletingPathExtension().lastPathComponent }.sorted()
+    /// Load the bundled CIS macOS benchmark (embedded in binary).
+    public static func loadBundled() throws -> BenchmarkDefinition {
+        try parse(yaml: EmbeddedBenchmarks.cisMacOS)
     }
 }
 

@@ -30,7 +30,7 @@ let package = Package(
             name: "ArmaziCore",
             dependencies: ["Yams"],
             path: "Sources/ArmaziCore",
-            resources: [.copy("Benchmarks")],
+            exclude: ["Benchmarks"],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .testTarget(
