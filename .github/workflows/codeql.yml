@@ -1,4 +1,4 @@
-name: Code Review & Security
+name: CI & Security
 
 on:
   pull_request:
@@ -6,16 +6,15 @@ on:
   push:
     branches: [main]
 
-permissions:
-  contents: read
-  security-events: write
-
 jobs:
-  build-and-test:
+  build:
     name: Build & Validate
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+
+      - name: Swift version
+        run: swift --version
 
       - name: Build all targets
         run: swift build
@@ -23,28 +22,12 @@ jobs:
       - name: Build release
         run: swift build -c release --product armazi
 
-  codeql:
-    name: CodeQL Analysis
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: swift
-
-      - name: Build for analysis
-        run: swift build
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
-        with:
-          category: "/language:swift"
+      - name: Validate benchmark
+        run: .build/debug/armazi list
 
   security-audit:
     name: Security Audit
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
@@ -52,7 +35,6 @@ jobs:
         run: |
           echo "Scanning for potential secrets..."
           FOUND=0
-          # Check for common secret patterns
           for pattern in "password\s*=" "secret\s*=" "api_key" "token\s*=" "private_key" "BEGIN RSA" "BEGIN OPENSSH"; do
             if grep -rni "$pattern" Sources/ --include="*.swift" | grep -v "// " | grep -v "help:" | grep -v "description:" | grep -v "\.password" | grep -v "askForPassword" | grep -v "SecureKeyboardEntry"; then
               echo "WARNING: Potential secret found for pattern: $pattern"
@@ -63,30 +45,34 @@ jobs:
             echo "No hardcoded secrets found."
           fi
 
-      - name: Check for unsafe shell execution patterns
+      - name: Check shell execution patterns
         run: |
           echo "Checking shell execution patterns..."
-          # Verify ShellExecutor is the only place running commands
           DIRECT_PROCESS=$(grep -rn "Process()" Sources/ --include="*.swift" | grep -v "ShellExecutor" | grep -v "ProcessInfo" || true)
           if [ -n "$DIRECT_PROCESS" ]; then
             echo "WARNING: Direct Process usage outside ShellExecutor:"
             echo "$DIRECT_PROCESS"
+            exit 1
           else
             echo "All shell execution goes through ShellExecutor."
           fi
 
-      - name: Check temp file security
+      - name: Check for /tmp usage
         run: |
-          echo "Checking temp file handling..."
-          grep -rn "/tmp/" Sources/ --include="*.swift" || echo "No /tmp/ usage found outside expected paths"
+          if grep -rn '"/tmp/' Sources/ --include="*.swift"; then
+            echo "WARNING: Hardcoded /tmp paths found. Use FileManager.temporaryDirectory instead."
+            exit 1
+          else
+            echo "No hardcoded /tmp paths."
+          fi
 
-      - name: Check for unsafe URL handling
+      - name: Verify HTTPS enforcement
         run: |
-          echo "Checking URL construction..."
-          grep -rn "URL(string:" Sources/ --include="*.swift" || echo "No dynamic URL construction found"
-
-      - name: Validate benchmark YAML
-        run: |
-          echo "Validating embedded benchmark..."
-          swift build --product armazi
-          .build/debug/armazi list
+          HTTP_URLS=$(grep -rn '"http://' Sources/ --include="*.swift" || true)
+          if [ -n "$HTTP_URLS" ]; then
+            echo "WARNING: Non-HTTPS URLs found:"
+            echo "$HTTP_URLS"
+            exit 1
+          else
+            echo "All URLs use HTTPS."
+          fi

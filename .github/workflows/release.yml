@@ -10,9 +10,12 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+
+      - name: Verify Swift version
+        run: swift --version
 
       - name: Build release binary
         run: swift build -c release --product armazi
@@ -23,10 +26,9 @@ jobs:
           shasum -a 256 armazi-macos-arm64 > checksums.txt
           cat checksums.txt
 
-      - name: Create Release
+      - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             armazi-macos-arm64
             checksums.txt
-          generate_release_notes: true
