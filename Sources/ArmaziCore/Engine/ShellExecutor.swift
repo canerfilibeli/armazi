@@ -20,16 +20,20 @@ public enum ShellExecutor {
                 process.standardOutput = stdout
                 process.standardError = stderr
 
+                // Read pipe data BEFORE waitUntilExit to prevent pipe deadlock (L5)
+                var outData = Data()
+                var errData = Data()
+
                 do {
                     try process.run()
-                    process.waitUntilExit()
                 } catch {
                     continuation.resume(returning: Result(output: error.localizedDescription, exitCode: -1))
                     return
                 }
 
-                let outData = stdout.fileHandleForReading.readDataToEndOfFile()
-                let errData = stderr.fileHandleForReading.readDataToEndOfFile()
+                outData = stdout.fileHandleForReading.readDataToEndOfFile()
+                errData = stderr.fileHandleForReading.readDataToEndOfFile()
+                process.waitUntilExit()
 
                 let outStr = String(data: outData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 let errStr = String(data: errData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -38,6 +42,14 @@ public enum ShellExecutor {
                 continuation.resume(returning: Result(output: combined, exitCode: process.terminationStatus))
             }
         }
+    }
+
+    /// Sanitize a check ID to prevent shell injection (C2).
+    /// Only allows alphanumeric characters, dots, and hyphens.
+    private static func sanitizeID(_ id: String) -> String {
+        String(id.unicodeScalars.filter {
+            CharacterSet.alphanumerics.contains($0) || $0 == "." || $0 == "-" || $0 == "_"
+        })
     }
 
     /// Runs multiple commands with administrator privileges in a single batch.
@@ -53,28 +65,52 @@ public enum ShellExecutor {
         // Build a batch script with markers between each command's output
         var script = "#!/bin/bash\n"
         for (id, command) in commands {
-            script += "echo '\(startMarker)\(id)\(endMarker)'\n"
+            let safeID = sanitizeID(id)
+            script += "echo '\(startMarker)\(safeID)\(endMarker)'\n"
             script += "\(command) 2>&1\n"
-            script += "echo '\(exitMarker)\(id):'$?'\(endMarker)'\n"
+            script += "echo '\(exitMarker)\(safeID):'$?'\(endMarker)'\n"
         }
 
-        // Write to a temp file
-        let pid = ProcessInfo.processInfo.processIdentifier
-        let tempPath = "/tmp/armazi_elevated_\(pid).sh"
-        do {
-            try script.write(toFile: tempPath, atomically: true, encoding: .utf8)
-        } catch {
+        // Write to a secure temp file (H2: unpredictable path, restrictive permissions)
+        let tempDir = FileManager.default.temporaryDirectory
+        let tempPath = tempDir.appendingPathComponent("armazi_\(UUID().uuidString).sh").path
+
+        let fm = FileManager.default
+        guard fm.createFile(
+            atPath: tempPath,
+            contents: script.data(using: .utf8),
+            attributes: [.posixPermissions: 0o700]
+        ) else {
             return commands.reduce(into: [:]) { $0[$1.id] = Result(output: "Failed to create temp script", exitCode: -1) }
         }
 
-        defer { try? FileManager.default.removeItem(atPath: tempPath) }
+        defer { try? fm.removeItem(atPath: tempPath) }
+
+        // Verify it's a regular file, not a symlink (H2)
+        var isDir: ObjCBool = false
+        guard fm.fileExists(atPath: tempPath, isDirectory: &isDir),
+              !isDir.boolValue else {
+            return commands.reduce(into: [:]) { $0[$1.id] = Result(output: "Temp file validation failed", exitCode: -1) }
+        }
 
         // Run via osascript with administrator privileges (one password prompt)
-        let osascript = "osascript -e 'do shell script \"bash " + tempPath + "\" with administrator privileges'"
+        let escapedPath = tempPath.replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "'", with: "'\\''")
+        let osascript = "osascript -e 'do shell script \"bash \\\"\(escapedPath)\\\"\" with administrator privileges'"
         let batchResult = await run(osascript)
 
-        // Parse output by markers
-        return parseElevatedOutput(batchResult.output, commands: commands, startMarker: startMarker, exitMarker: exitMarker, endMarker: endMarker)
+        // Parse output by markers (use sanitized IDs for lookup)
+        let idMap = Dictionary(uniqueKeysWithValues: commands.map { ($0.id, sanitizeID($0.id)) })
+        let parsed = parseElevatedOutput(batchResult.output, commands: commands.map { (sanitizeID($0.id), $0.command) },
+                                          startMarker: startMarker, exitMarker: exitMarker, endMarker: endMarker)
+
+        // Map back to original IDs
+        var results: [String: Result] = [:]
+        for (origID, safeID) in idMap {
+            results[origID] = parsed[safeID] ?? Result(output: "No output captured", exitCode: -1)
+        }
+        return results
     }
 
     private static func parseElevatedOutput(
@@ -92,7 +128,6 @@ public enum ShellExecutor {
 
         for line in lines {
             if line.hasPrefix(startMarker) && line.hasSuffix(endMarker) {
-                // Save previous check's output
                 if let id = currentID {
                     results[id] = Result(output: currentOutput.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines), exitCode: 0)
                 }
@@ -116,12 +151,10 @@ public enum ShellExecutor {
             }
         }
 
-        // Handle any remaining output
         if let id = currentID {
             results[id] = Result(output: currentOutput.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines), exitCode: 0)
         }
 
-        // Fill in missing results
         for (id, _) in commands where results[id] == nil {
             results[id] = Result(output: "No output captured", exitCode: -1)
         }

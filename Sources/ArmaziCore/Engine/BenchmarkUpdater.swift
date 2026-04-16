@@ -6,6 +6,11 @@ public enum BenchmarkUpdater {
     private static let branch = "main"
     private static let benchmarkPath = "Sources/ArmaziCore/Benchmarks"
 
+    /// Allowed filename pattern: alphanumeric, hyphens, underscores, dots.
+    private static func isSafeFilename(_ name: String) -> Bool {
+        name.range(of: #"^[a-zA-Z0-9._-]+\.(yaml|yml)$"#, options: .regularExpression) != nil
+    }
+
     public enum UpdateResult: Sendable {
         case updated([String])
         case upToDate
@@ -39,7 +44,6 @@ public enum BenchmarkUpdater {
 
         guard !yamlFiles.isEmpty else { return .failed("No benchmark files found in repository") }
 
-        // Ensure local directory exists
         let localDir = BenchmarkParser.localDir
         try? FileManager.default.createDirectory(at: localDir, withIntermediateDirectories: true)
 
@@ -49,17 +53,26 @@ public enum BenchmarkUpdater {
                   let name = file["name"] as? String,
                   let remoteURL = URL(string: downloadURL) else { continue }
 
+            // Path traversal protection (H4): validate filename
+            let safeName = URL(fileURLWithPath: name).lastPathComponent
+            guard isSafeFilename(safeName) else { continue }
+
+            // Enforce HTTPS (M3)
+            guard remoteURL.scheme == "https" else { continue }
+
             do {
                 let (fileData, _) = try await URLSession.shared.data(from: remoteURL)
-                let dest = localDir.appendingPathComponent(name)
-
-                // Check if content differs
-                let existing = try? String(contentsOf: dest, encoding: .utf8)
                 let newContent = String(data: fileData, encoding: .utf8) ?? ""
+
+                // Validate it's parseable YAML before saving (H3)
+                _ = try BenchmarkParser.parse(yaml: newContent)
+
+                let dest = localDir.appendingPathComponent(safeName)
+                let existing = try? String(contentsOf: dest, encoding: .utf8)
 
                 if existing != newContent {
                     try fileData.write(to: dest)
-                    updated.append(name)
+                    updated.append(safeName)
                 }
             } catch {
                 continue

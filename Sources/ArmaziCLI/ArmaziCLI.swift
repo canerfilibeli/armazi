@@ -13,16 +13,16 @@ struct ArmaziCLI: AsyncParsableCommand {
         defaultSubcommand: Scan.self
     )
 
-    /// Run update check before any subcommand executes.
+    /// Check for new version (notify only, never auto-install).
     static func checkForUpdates() async {
-        let result = await SelfUpdater.checkAndUpdate(currentVersion: appVersion)
+        let result = await SelfUpdater.checkForUpdate(currentVersion: appVersion)
         switch result {
         case .upToDate:
             break
-        case .updated(let version):
-            print("  \(CLIReporter.green)Updated to v\(version). Please re-run your command.\(CLIReporter.reset)")
-        case .skipped(let reason):
-            print("  \(CLIReporter.dim)Skipping update: \(reason)\(CLIReporter.reset)")
+        case .available(let version):
+            print("  \(CLIReporter.yellow)New version available: v\(version). Run \(CLIReporter.reset)armazi update\(CLIReporter.yellow) to install.\(CLIReporter.reset)")
+        case .updated, .skipped:
+            break
         }
     }
 }

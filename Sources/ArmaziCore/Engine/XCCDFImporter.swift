@@ -36,6 +36,7 @@ public final class XCCDFImporter: NSObject, XMLParserDelegate {
 
     private func parseXML(_ data: Data) -> [ParsedRule] {
         let parser = XMLParser(data: data)
+        parser.shouldResolveExternalEntities = false
         parser.delegate = self
         parser.parse()
         return rules
