@@ -135,6 +135,7 @@ checks:
     category: "access_security"
     level: 1
     scored: false
+    elevated: true
     audit:
       command: |
         result=$(security authorizationdb read system.preferences 2>/dev/null | grep -c "shared.*false")
@@ -320,6 +321,7 @@ checks:
     category: "firewall_sharing"
     level: 1
     scored: true
+    elevated: true
     audit:
       command: "/usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate 2>&1"
       match:
@@ -395,6 +397,7 @@ checks:
     category: "firewall_sharing"
     level: 1
     scored: true
+    elevated: true
     audit:
       command: |
         if systemsetup -getremotelogin 2>/dev/null | grep -qi "off"; then
@@ -504,6 +507,7 @@ checks:
     category: "system_integrity"
     level: 1
     scored: true
+    elevated: true
     audit:
       command: |
         arch=$(uname -m)

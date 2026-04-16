@@ -8,9 +8,28 @@ public struct CheckDefinition: Codable, Identifiable, Sendable {
     public let category: CheckCategory
     public let level: Int
     public let scored: Bool
+    public let elevated: Bool
     public let audit: AuditCommand
     public let remediation: String?
     public let frameworks: [ComplianceFramework]
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, description, category, level, scored, elevated, audit, remediation, frameworks
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        description = try container.decode(String.self, forKey: .description)
+        category = try container.decode(CheckCategory.self, forKey: .category)
+        level = try container.decode(Int.self, forKey: .level)
+        scored = try container.decode(Bool.self, forKey: .scored)
+        elevated = try container.decodeIfPresent(Bool.self, forKey: .elevated) ?? false
+        audit = try container.decode(AuditCommand.self, forKey: .audit)
+        remediation = try container.decodeIfPresent(String.self, forKey: .remediation)
+        frameworks = try container.decode([ComplianceFramework].self, forKey: .frameworks)
+    }
 
     public struct AuditCommand: Codable, Sendable {
         public let command: String

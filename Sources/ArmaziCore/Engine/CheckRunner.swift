@@ -10,6 +10,7 @@ public final class CheckRunner: ObservableObject, @unchecked Sendable {
     public init() {}
 
     /// Run all checks in a benchmark and return a scan report.
+    /// Elevated checks are batched into a single admin password prompt.
     @MainActor
     public func run(benchmark: BenchmarkDefinition, level: Int = 1) async -> ScanReport {
         results = []
@@ -20,9 +21,26 @@ public final class CheckRunner: ObservableObject, @unchecked Sendable {
         let checks = benchmark.checks.filter { $0.level <= level }
         let total = Double(checks.count)
 
+        // Pre-fetch elevated check results in one batch (single password prompt)
+        let elevatedChecks = checks.filter { $0.elevated }
+        var elevatedResults: [String: ShellExecutor.Result] = [:]
+        if !elevatedChecks.isEmpty {
+            currentCheck = "Requesting administrator privileges..."
+            elevatedResults = await ShellExecutor.runElevatedBatch(
+                elevatedChecks.map { ($0.id, $0.audit.command) }
+            )
+        }
+
         for (index, check) in checks.enumerated() {
             currentCheck = check.title
-            let result = await runSingleCheck(check)
+
+            let result: CheckResult
+            if check.elevated, let shellResult = elevatedResults[check.id] {
+                result = evaluate(check: check, shellResult: shellResult)
+            } else {
+                result = await runSingleCheck(check)
+            }
+
             results.append(result)
             progress = Double(index + 1) / total
         }
@@ -38,10 +56,12 @@ public final class CheckRunner: ObservableObject, @unchecked Sendable {
         )
     }
 
-    /// Run a single check definition against the system.
     private func runSingleCheck(_ check: CheckDefinition) async -> CheckResult {
         let shellResult = await ShellExecutor.run(check.audit.command)
+        return evaluate(check: check, shellResult: shellResult)
+    }
 
+    private func evaluate(check: CheckDefinition, shellResult: ShellExecutor.Result) -> CheckResult {
         let passed: Bool
         switch check.audit.match {
         case .contains(let expected):
