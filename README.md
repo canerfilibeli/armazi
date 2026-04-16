@@ -338,6 +338,24 @@ To report a security vulnerability, please open an issue on GitHub.
 
 ---
 
+## Roadmap
+
+- [ ] **macOS .app bundle** — double-click to launch, Dock icon, notarization
+- [ ] **Menu bar agent** — background process showing security score in the menu bar
+- [ ] **One-click remediation** — "Fix" button in GUI that applies the recommended fix
+- [ ] **PDF report export** — generate compliance reports from CLI and GUI
+- [ ] **Python cross-platform CLI** — `pip install armazi` for Linux and Windows
+- [ ] **Web dashboard** — centralized reporting portal for multiple machines
+- [ ] **Expand macOS checks** — full CIS Benchmark coverage (100+ checks)
+- [ ] **Linux benchmark YAMLs** — Ubuntu, Debian, RHEL, Fedora, SUSE
+- [ ] **Windows benchmark YAMLs** — Windows 10/11 and Server
+- [ ] **DISA STIG importer** — direct import from public.cyber.mil
+- [ ] **Scheduled scans** — periodic scans with drift detection and notifications
+- [ ] **Team dashboard** — track compliance across a fleet of machines
+- [ ] **Homebrew Cask** — `brew install --cask armazi` for the GUI app
+
+---
+
 ## Contributing
 
 Contributions are welcome. The easiest way to contribute is by adding or improving checks in the benchmark YAML file — no Swift knowledge required.
