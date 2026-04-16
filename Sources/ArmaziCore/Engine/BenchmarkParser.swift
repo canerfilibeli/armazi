@@ -4,6 +4,12 @@ import Yams
 /// Parses benchmark definition files from YAML.
 public enum BenchmarkParser {
 
+    /// Local benchmark storage directory.
+    public static var localDir: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".config/armazi/benchmarks")
+    }
+
     /// Parse a benchmark from a YAML string.
     public static func parse(yaml: String) throws -> BenchmarkDefinition {
         let decoder = YAMLDecoder()
@@ -16,9 +22,26 @@ public enum BenchmarkParser {
         return try parse(yaml: content)
     }
 
-    /// Load the bundled CIS macOS benchmark (embedded in binary).
+    /// Load the best available benchmark:
+    /// 1. Local override (~/.config/armazi/benchmarks/cis-macos-benchmark.yaml)
+    /// 2. Embedded default (compiled into binary)
     public static func loadBundled() throws -> BenchmarkDefinition {
-        try parse(yaml: EmbeddedBenchmarks.cisMacOS)
+        let localFile = localDir.appendingPathComponent("cis-macos-benchmark.yaml")
+        if FileManager.default.fileExists(atPath: localFile.path) {
+            return try parse(fileURL: localFile)
+        }
+        return try parse(yaml: EmbeddedBenchmarks.cisMacOS)
+    }
+
+    /// List locally available benchmark files.
+    public static func listLocal() -> [String] {
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            at: localDir, includingPropertiesForKeys: nil
+        ) else { return [] }
+        return contents
+            .filter { $0.pathExtension == "yaml" || $0.pathExtension == "yml" }
+            .map { $0.deletingPathExtension().lastPathComponent }
+            .sorted()
     }
 }
 

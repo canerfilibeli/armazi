@@ -9,7 +9,7 @@ struct ArmaziCLI: AsyncParsableCommand {
         commandName: "armazi",
         abstract: "macOS security auditor — scan your system against CIS Benchmarks.",
         version: appVersion,
-        subcommands: [Scan.self, Status.self, ListChecks.self, Update.self],
+        subcommands: [Scan.self, Status.self, ListChecks.self, Update.self, UpdateBenchmarks.self, Import.self],
         defaultSubcommand: Scan.self
     )
 
