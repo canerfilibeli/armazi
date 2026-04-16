@@ -105,7 +105,7 @@ swift run armazi-cli     # CLI tool
 
 Contributions are welcome. The easiest way to contribute is by adding or improving checks in the benchmark YAML file — no Swift knowledge required.
 
-See [CLAUDE.md](CLAUDE.md) for development guidelines.
+See [Development_Guide.md](Development_Guide.md) for development guidelines.
 
 ## License
 
