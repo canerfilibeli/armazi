@@ -1,5 +1,6 @@
 import SwiftUI
 import ArmaziCore
+import UniformTypeIdentifiers
 
 struct DashboardView: View {
     @ObservedObject var viewModel: DashboardViewModel
@@ -14,9 +15,13 @@ struct DashboardView: View {
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 levelPicker
+                updateBenchmarksButton
+                importMenu
                 scanButton
-                importButton
             }
+        }
+        .overlay(alignment: .bottom) {
+            statusBar
         }
         .alert("Error", isPresented: .init(
             get: { viewModel.errorMessage != nil },
@@ -25,6 +30,30 @@ struct DashboardView: View {
             Button("OK") { viewModel.errorMessage = nil }
         } message: {
             Text(viewModel.errorMessage ?? "")
+        }
+    }
+
+    // MARK: - Status Bar
+
+    @ViewBuilder
+    private var statusBar: some View {
+        if let message = viewModel.statusMessage {
+            HStack(spacing: 8) {
+                if viewModel.isUpdatingBenchmarks || viewModel.isImporting {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(.regularMaterial)
+            .clipShape(Capsule())
+            .padding(.bottom, 12)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .animation(.easeInOut, value: message)
         }
     }
 
@@ -129,7 +158,7 @@ struct DashboardView: View {
                 ContentUnavailableView(
                     "No Benchmark Loaded",
                     systemImage: "doc.questionmark",
-                    description: Text("Load a benchmark YAML file or use the bundled CIS macOS Benchmark.")
+                    description: Text("Import a benchmark file or update from GitHub.")
                 )
             } else if viewModel.report == nil && !viewModel.runner.isRunning {
                 ContentUnavailableView(
@@ -175,23 +204,45 @@ struct DashboardView: View {
         .help("Run all checks")
     }
 
-    private var importButton: some View {
+    private var updateBenchmarksButton: some View {
         Button {
-            let panel = NSOpenPanel()
-            panel.allowedContentTypes = [.yaml]
-            panel.canChooseFiles = true
-            panel.canChooseDirectories = false
-            if panel.runModal() == .OK, let url = panel.url {
-                viewModel.loadBenchmark(from: url)
+            Task { await viewModel.updateBenchmarks() }
+        } label: {
+            Label("Update", systemImage: "arrow.clockwise")
+        }
+        .disabled(viewModel.isUpdatingBenchmarks)
+        .help("Download latest benchmarks from GitHub")
+    }
+
+    private var importMenu: some View {
+        Menu {
+            Button("Import YAML Benchmark...") {
+                openFile(types: [.yaml, .plainText]) { url in
+                    viewModel.importBenchmarkFile(from: url)
+                }
+            }
+            Button("Import CIS XCCDF (XML)...") {
+                openFile(types: [.xml]) { url in
+                    viewModel.importBenchmarkFile(from: url)
+                }
             }
         } label: {
             Label("Import", systemImage: "square.and.arrow.down")
         }
-        .help("Import a custom benchmark YAML file")
+        .help("Import a benchmark file")
+    }
+
+    private func openFile(types: [UTType], completion: @escaping (URL) -> Void) {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = types
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        if panel.runModal() == .OK, let url = panel.url {
+            completion(url)
+        }
     }
 }
 
-import UniformTypeIdentifiers
 extension UTType {
     static let yaml = UTType(filenameExtension: "yaml") ?? .plainText
 }
