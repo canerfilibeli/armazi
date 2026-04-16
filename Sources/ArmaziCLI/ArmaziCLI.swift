@@ -3,7 +3,7 @@ import ArmaziCore
 
 @main
 struct ArmaziCLI: AsyncParsableCommand {
-    static let appVersion = "1.0.0"
+    static let appVersion = "1.1.0"
 
     static let configuration = CommandConfiguration(
         commandName: "armazi",
