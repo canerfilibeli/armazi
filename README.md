@@ -35,6 +35,8 @@ Sources/
 │   ├── Models/          # CheckDefinition, CheckResult, ScanReport, etc.
 │   ├── Engine/          # BenchmarkParser (YAML), CheckRunner, ShellExecutor
 │   └── Benchmarks/      # Bundled YAML benchmark files
+├── ArmaziCLI/           # Command-line interface (scan, status, list)
+│   └── Benchmarks/      # Bundled YAML benchmark files
 └── Armazi/              # SwiftUI macOS application
     ├── Views/           # Dashboard, category detail, report views
     └── ViewModels/      # DashboardViewModel
@@ -72,13 +74,31 @@ You can create your own benchmark YAML files. Each check defines:
 | `regex` | Output matches the regular expression |
 | `exit_code` | Command exit code equals the value |
 
+## CLI
+
+Armazi also ships as a command-line tool:
+
+```bash
+swift run armazi-cli              # run a full scan (default)
+swift run armazi-cli status       # quick status summary
+swift run armazi-cli list         # list all checks
+swift run armazi-cli scan -v      # verbose scan with remediation steps
+swift run armazi-cli scan --json  # JSON output (for CI/CD)
+swift run armazi-cli scan --watch # re-run checks periodically
+swift run armazi-cli scan --check 2.4  # run a single check
+swift run armazi-cli scan --category firewall_sharing  # scan one category
+```
+
+Exit code is non-zero when any check fails — useful in CI pipelines.
+
 ## Building
 
 Requires macOS 14+ and Swift 6.0+.
 
 ```bash
 swift build
-swift run Armazi
+swift run Armazi         # GUI app
+swift run armazi-cli     # CLI tool
 ```
 
 ## Contributing

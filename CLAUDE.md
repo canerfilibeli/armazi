@@ -2,19 +2,23 @@
 
 ## Project overview
 
-Armazi is an open-source macOS security auditor. It reads benchmark YAML files that define security checks (audit command + expected result), runs them against the system, and reports compliance status via a SwiftUI GUI.
+Armazi is an open-source macOS security auditor. It reads benchmark YAML files that define security checks (audit command + expected result), runs them against the system, and reports compliance status via a SwiftUI GUI or CLI.
 
 ## Architecture
 
-- **ArmaziCore** (library target): Models, benchmark YAML parser (Yams), check runner, shell executor. This is the shared engine — both the GUI app and future CLI will depend on it.
+- **ArmaziCore** (library target): Models, benchmark YAML parser (Yams), check runner, shell executor. Shared engine used by both GUI and CLI.
 - **Armazi** (executable target): SwiftUI macOS application. Views, ViewModels, app entry point.
+- **armazi-cli** (executable target): Command-line interface using swift-argument-parser. Subcommands: `scan`, `status`, `list`.
 
 ## Build & run
 
 ```bash
-swift build          # build both targets
-swift run Armazi     # launch the GUI app
-swift test           # run tests
+swift build              # build all targets
+swift run Armazi          # launch the GUI app
+swift run armazi-cli      # run CLI (defaults to scan)
+swift run armazi-cli status   # quick status
+swift run armazi-cli list     # list all checks
+swift test                # run tests (requires Xcode)
 ```
 
 ## Key conventions
@@ -46,3 +50,4 @@ Tests are in `Tests/ArmaziTests/`. When adding engine tests, test against `Armaz
 ## Dependencies
 
 - [Yams](https://github.com/jpsim/Yams) — YAML parsing
+- [swift-argument-parser](https://github.com/apple/swift-argument-parser) — CLI argument parsing

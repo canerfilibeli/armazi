@@ -7,4 +7,12 @@ public struct BenchmarkDefinition: Codable, Sendable {
     public let platform: String
     public let description: String
     public let checks: [CheckDefinition]
+
+    public init(name: String, version: String, platform: String, description: String, checks: [CheckDefinition]) {
+        self.name = name
+        self.version = version
+        self.platform = platform
+        self.description = description
+        self.checks = checks
+    }
 }
