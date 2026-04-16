@@ -12,7 +12,7 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "Armazi",
+            name: "ArmaziApp",
             dependencies: ["ArmaziCore"],
             path: "Sources/Armazi",
             swiftSettings: [.swiftLanguageMode(.v5)]

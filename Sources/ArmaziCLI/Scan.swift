@@ -31,7 +31,14 @@ struct Scan: AsyncParsableCommand {
     @Option(name: .long, help: "Watch interval in seconds (default: 60).")
     var interval: Int = 60
 
+    @Flag(name: .long, help: "Skip the automatic update check.")
+    var skipUpdate: Bool = false
+
     func run() async throws {
+        if !skipUpdate && !json {
+            await ArmaziCLI.checkForUpdates()
+        }
+
         let benchmarkDef: BenchmarkDefinition
         if let path = benchmark {
             benchmarkDef = try BenchmarkParser.parse(fileURL: URL(fileURLWithPath: path))

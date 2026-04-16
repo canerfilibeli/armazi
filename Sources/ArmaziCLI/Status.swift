@@ -10,6 +10,7 @@ struct Status: AsyncParsableCommand {
     var level: Int = 1
 
     func run() async throws {
+        await ArmaziCLI.checkForUpdates()
         let benchmark = try BenchmarkParser.loadBundled()
         let runner = CheckRunner()
         let report = await runner.run(benchmark: benchmark, level: level)
