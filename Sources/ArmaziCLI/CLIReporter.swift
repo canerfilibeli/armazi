@@ -31,14 +31,15 @@ enum CLIReporter {
     // MARK: - Report Formatting
 
     static func printHeader(_ benchmark: BenchmarkDefinition) {
+        let platform = Platform.detect()
         print()
         print("\(bold)\(cyan)  ╔══════════════════════════════════════════════╗\(reset)")
         print("\(bold)\(cyan)  ║            ⛊  ARMAZI  ⛊                    ║\(reset)")
-        print("\(bold)\(cyan)  ║     macOS Security Auditor                  ║\(reset)")
+        print("\(bold)\(cyan)  ║     Security Auditor                        ║\(reset)")
         print("\(bold)\(cyan)  ╚══════════════════════════════════════════════╝\(reset)")
         print()
+        print("  \(dim)System:\(reset)    \(platform)")
         print("  \(dim)Benchmark:\(reset) \(benchmark.name) v\(benchmark.version)")
-        print("  \(dim)Platform:\(reset)  \(benchmark.platform)")
         print()
     }
 

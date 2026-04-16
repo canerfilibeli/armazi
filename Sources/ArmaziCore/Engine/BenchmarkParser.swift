@@ -22,15 +22,10 @@ public enum BenchmarkParser {
         return try parse(yaml: content)
     }
 
-    /// Load the best available benchmark:
-    /// 1. Local override (~/.config/armazi/benchmarks/cis-macos-benchmark.yaml)
-    /// 2. Embedded default (compiled into binary)
+    /// Load the best available benchmark for the current platform.
+    /// Priority: local override → platform-specific local → embedded default
     public static func loadBundled() throws -> BenchmarkDefinition {
-        let localFile = localDir.appendingPathComponent("cis-macos-benchmark.yaml")
-        if FileManager.default.fileExists(atPath: localFile.path) {
-            return try parse(fileURL: localFile)
-        }
-        return try parse(yaml: EmbeddedBenchmarks.cisMacOS)
+        try BenchmarkRegistry.loadForCurrentPlatform()
     }
 
     /// List locally available benchmark files.

@@ -18,8 +18,11 @@ struct Status: AsyncParsableCommand {
         let score = Int(report.scorePercentage)
         let scoreColor = score >= 80 ? CLIReporter.green : (score >= 50 ? CLIReporter.yellow : CLIReporter.red)
 
+        let platform = Platform.detect()
+
         print()
         print("  \(CLIReporter.bold)Armazi Security Status\(CLIReporter.reset)")
+        print("  \(CLIReporter.dim)\(platform)\(CLIReporter.reset)")
         print()
         print("  \(scoreColor)\(CLIReporter.bold)\(score)%\(CLIReporter.reset) \(CLIReporter.dim)— \(report.passCount) passed, \(report.failCount) failed out of \(report.totalChecks) checks\(CLIReporter.reset)")
         print()
