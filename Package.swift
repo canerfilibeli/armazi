@@ -18,7 +18,7 @@ let package = Package(
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .executableTarget(
-            name: "armazi-cli",
+            name: "armazi",
             dependencies: [
                 "ArmaziCore",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
