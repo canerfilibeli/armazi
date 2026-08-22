@@ -6,12 +6,16 @@ struct Status: AsyncParsableCommand {
         abstract: "Quick status summary of your system security."
     )
 
+    @Option(name: .shortAndLong, help: ProfileOption.help)
+    var profile: String = BenchmarkProfile.cis.rawValue
+
     @Option(name: .shortAndLong, help: "CIS profile level (1 or 2).")
     var level: Int = 1
 
     func run() async throws {
         await ArmaziCLI.checkForUpdates()
-        let benchmark = try BenchmarkParser.loadBundled()
+        let selected = try ProfileOption.parse(profile)
+        let benchmark = try BenchmarkParser.loadBundled(profile: selected)
         let runner = CheckRunner()
         let report = await runner.run(benchmark: benchmark, level: level)
 
@@ -22,7 +26,7 @@ struct Status: AsyncParsableCommand {
 
         print()
         print("  \(CLIReporter.bold)Armazi Security Status\(CLIReporter.reset)")
-        print("  \(CLIReporter.dim)\(platform)\(CLIReporter.reset)")
+        print("  \(CLIReporter.dim)\(platform) — \(selected.displayName)\(CLIReporter.reset)")
         print()
         print("  \(scoreColor)\(CLIReporter.bold)\(score)%\(CLIReporter.reset) \(CLIReporter.dim)— \(report.passCount) passed, \(report.failCount) failed out of \(report.totalChecks) checks\(CLIReporter.reset)")
         print()
@@ -38,8 +42,9 @@ struct Status: AsyncParsableCommand {
         }
         print()
 
-        if report.failCount > 0 {
-            print("  \(CLIReporter.dim)Run \(CLIReporter.reset)armazi scan --verbose\(CLIReporter.dim) to see details and remediation steps.\(CLIReporter.reset)")
+        if report.failCount > 0 || report.warningCount > 0 {
+            let profileFlag = selected == .cis ? "" : " --profile \(selected.rawValue)"
+            print("  \(CLIReporter.dim)Run \(CLIReporter.reset)armazi scan\(profileFlag) --verbose\(CLIReporter.dim) to see details and remediation steps.\(CLIReporter.reset)")
             print()
         }
     }

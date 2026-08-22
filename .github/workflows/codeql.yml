@@ -16,14 +16,28 @@ jobs:
       - name: Swift version
         run: swift --version
 
+      - name: Install benchmark lint dependencies
+        run: pip3 install --quiet pyyaml || pip3 install --quiet --break-system-packages pyyaml
+
+      - name: Validate benchmark YAML
+        run: Scripts/validate-benchmarks.py
+
+      - name: Verify embedded benchmarks are up to date
+        run: Scripts/embed-benchmarks.py --check
+
       - name: Build all targets
         run: swift build
 
       - name: Build release
         run: swift build -c release --product armazi
 
+      - name: Run tests
+        run: swift test
+
       - name: Validate benchmark
-        run: .build/debug/armazi list
+        run: |
+          .build/debug/armazi list
+          .build/debug/armazi list --profile personal
 
   security-audit:
     name: Security Audit

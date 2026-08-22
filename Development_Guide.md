@@ -29,12 +29,42 @@ swift test                # run tests (requires Xcode)
 - Shell commands run via `ShellExecutor.run(_:)` which returns `(output, exitCode)` asynchronously
 - Check definitions live in YAML files under `Sources/ArmaziCore/Benchmarks/`, not in Swift code
 
+## Benchmark profiles
+
+Two profiles ship with the binary, selected with `--profile` (`BenchmarkProfile` in `Models/`):
+
+- `cis` — `Benchmarks/cis-macos-benchmark.yaml`, system hardening and compliance
+- `personal` — `Benchmarks/personal-protection-macos.yaml`, everyday consumer protection
+
+Both are embedded in the binary as raw string literals in `Engine/EmbeddedBenchmarks.swift`. **That file is generated — never edit it by hand.**
+
+```bash
+Scripts/validate-benchmarks.py    # schema + /bin/sh syntax lint
+Scripts/embed-benchmarks.py       # regenerate EmbeddedBenchmarks.swift
+Scripts/embed-benchmarks.py --check   # CI: fail if it is stale
+```
+
 ## Adding a new check
 
-1. Edit `Sources/ArmaziCore/Benchmarks/cis-macos-benchmark.yaml`
+1. Edit the benchmark YAML for the profile the check belongs to
 2. Add a new entry following the existing format
 3. Test the audit command manually in Terminal first
-4. The check will automatically appear in the UI after rebuild
+4. Run `Scripts/validate-benchmarks.py`, then `Scripts/embed-benchmarks.py`
+5. The check will automatically appear in the UI after rebuild
+
+### Writing consumer checks
+
+Checks in the personal profile follow a few extra conventions, because a
+false alarm on someone's own machine costs more than a missed finding:
+
+- The script prints its own verdict: `PASS:`, `FAIL:`, `UNKNOWN:` (setting
+  could not be read), or `MANUAL:` (cannot be determined locally). The match
+  rule is `contains: "PASS"`.
+- Anything that depends on data macOS protects behind Full Disk Access —
+  Safari preferences above all — is `scored: false`, so an unreadable
+  setting surfaces as a warning rather than a failure.
+- Every check carries a `remediation` written as the exact clicks to make,
+  not a policy statement.
 
 ## Match rule types
 

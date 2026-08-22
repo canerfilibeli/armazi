@@ -24,8 +24,8 @@ public enum BenchmarkParser {
 
     /// Load the best available benchmark for the current platform.
     /// Priority: local override → platform-specific local → embedded default
-    public static func loadBundled() throws -> BenchmarkDefinition {
-        try BenchmarkRegistry.loadForCurrentPlatform()
+    public static func loadBundled(profile: BenchmarkProfile = .cis) throws -> BenchmarkDefinition {
+        try BenchmarkRegistry.loadForCurrentPlatform(profile: profile)
     }
 
     /// List locally available benchmark files.

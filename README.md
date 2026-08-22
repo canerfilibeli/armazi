@@ -39,9 +39,31 @@ sudo cp .build/release/armazi /usr/local/bin/
 ## Quick Start
 
 ```bash
-armazi                # run a full scan (default command)
-armazi status         # one-line security summary
+armazi                            # run a full scan (default command)
+armazi status                     # one-line security summary
+armazi scan --profile personal    # everyday protection instead of compliance
 ```
+
+---
+
+## Profiles
+
+Armazi ships two benchmark profiles. Every command takes `--profile` (`-p`).
+
+| Profile | What it audits |
+|---|---|
+| `cis` *(default)* | System hardening against the CIS macOS Benchmark, mapped to ISO 27001, NIST CSF, Cyber Essentials, and SOC |
+| `personal` | The protections people actually ask for on their own machines: identity and accounts, device and data, online safety, home network, privacy |
+
+```bash
+armazi scan --profile personal --verbose
+armazi list --profile personal
+armazi status --profile personal
+```
+
+The **Personal Protection** profile answers the consumer question — *is my identity, my data, my browsing, my home network, and my privacy actually protected on this machine?* — with 31 checks across five categories. Checks that depend on data macOS keeps behind Full Disk Access (Safari settings in particular) are advisory: they report `UNKNOWN` rather than failing, so a missing permission never looks like a security problem.
+
+[docs/PRODUCT_FEATURES.md](docs/PRODUCT_FEATURES.md) maps the full consumer wishlist — password vaults, dark web monitoring, ransomware rollback, VPNs, family coverage, hotlines — to what Armazi checks today, what is planned, and what an auditor deliberately will not become.
 
 ---
 
@@ -56,15 +78,24 @@ armazi scan                  # full scan with colored output
 armazi scan --verbose        # include remediation steps for each failure
 armazi scan --json           # output results as JSON (for CI/CD pipelines)
 armazi scan --level 2        # use CIS Level 2 profile (stricter)
+armazi scan --profile personal   # everyday protection checks
 ```
 
 **Filter by category:**
 
 ```bash
+# cis profile
 armazi scan --category access_security
 armazi scan --category firewall_sharing
 armazi scan --category updates
 armazi scan --category system_integrity
+
+# personal profile
+armazi scan --profile personal --category identity_protection
+armazi scan --profile personal --category data_protection
+armazi scan --profile personal --category online_safety
+armazi scan --profile personal --category home_network
+armazi scan --profile personal --category privacy
 ```
 
 **Run a single check:**
@@ -98,6 +129,7 @@ Quick one-line summary showing your score and category breakdown.
 ```bash
 armazi status
 armazi status --level 2
+armazi status --profile personal
 ```
 
 Example output:
@@ -295,7 +327,7 @@ Add `elevated: true` to checks that require admin privileges. All elevated check
 ## Benchmark Loading Priority
 
 1. **Custom file** — `armazi scan --benchmark path/to/file.yaml`
-2. **Local overrides** — `~/.config/armazi/benchmarks/cis-macos-benchmark.yaml`
+2. **Local overrides** — `~/.config/armazi/benchmarks/cis-macos-benchmark.yaml`, or `personal-protection-macos.yaml` for `--profile personal`
 3. **Built-in default** — embedded in the binary, always available
 
 Use `armazi update-benchmarks` to pull the latest from GitHub into the local overrides directory.
@@ -307,14 +339,18 @@ Use `armazi update-benchmarks` to pull the latest from GitHub into the local ove
 ```
 Sources/
 ├── ArmaziCore/          # Shared library
-│   ├── Models/          # CheckDefinition, CheckResult, ScanReport
+│   ├── Models/          # CheckDefinition, CheckResult, ScanReport,
+│   │                    # BenchmarkProfile, CheckCategory
 │   ├── Engine/          # BenchmarkParser, CheckRunner, ShellExecutor,
 │   │                    # SelfUpdater, BenchmarkUpdater, XCCDFImporter
-│   └── Benchmarks/      # Source YAML files
+│   └── Benchmarks/      # Source YAML files (cis, personal-protection)
 ├── ArmaziCLI/           # CLI (scan, status, list, update, import)
 └── Armazi/              # SwiftUI macOS GUI application
     ├── Views/           # Dashboard, category detail, report, score ring
     └── ViewModels/      # DashboardViewModel
+
+Scripts/                 # validate-benchmarks.py, embed-benchmarks.py
+docs/                    # PRODUCT_FEATURES.md — consumer feature map
 ```
 
 `ArmaziCore` is a standalone library used by both the CLI and the GUI app.
@@ -354,6 +390,17 @@ To report a security vulnerability, please open an issue on GitHub.
 - [ ] **Team dashboard** — track compliance across a fleet of machines
 - [ ] **Homebrew Cask** — `brew install --cask armazi` for the GUI app
 
+### Personal Protection roadmap
+
+Derived from the consumer feature map in [docs/PRODUCT_FEATURES.md](docs/PRODUCT_FEATURES.md):
+
+- [ ] **Full Disk Access guidance** — detect the missing permission once instead of five `UNKNOWN` browser checks
+- [ ] **Home network inventory** — passive device list with a stored baseline, alert on new devices (covers the IoT asks)
+- [ ] **Router hardening checks** — plain-HTTP admin interface, default gateway credentials, UPnP exposure
+- [ ] **Screen Time / parental control checks** — safe browsing for family machines
+- [ ] **Firefox and Chrome profile checks** — the Safari checks, generalised
+- [ ] **Household view** — several machines, one report
+
 ---
 
 ## Contributing
@@ -361,9 +408,11 @@ To report a security vulnerability, please open an issue on GitHub.
 Contributions are welcome. The easiest way to contribute is by adding or improving checks in the benchmark YAML file — no Swift knowledge required.
 
 1. Fork the repository
-2. Edit `Sources/ArmaziCore/Benchmarks/cis-macos-benchmark.yaml`
+2. Edit `Sources/ArmaziCore/Benchmarks/cis-macos-benchmark.yaml` (compliance) or `personal-protection-macos.yaml` (everyday protection)
 3. Test the audit command in Terminal first
-4. Submit a pull request
+4. Run `Scripts/validate-benchmarks.py` — it lints the schema and shell syntax
+5. Run `Scripts/embed-benchmarks.py` — benchmarks are embedded in the binary and the generated file must be committed
+6. Submit a pull request
 
 See [Development_Guide.md](Development_Guide.md) for build instructions and coding conventions.
 

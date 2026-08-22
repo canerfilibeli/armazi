@@ -10,6 +10,9 @@ struct Scan: AsyncParsableCommand {
     @Option(name: .shortAndLong, help: "Path to a custom benchmark YAML file.")
     var benchmark: String?
 
+    @Option(name: .shortAndLong, help: ProfileOption.help)
+    var profile: String = BenchmarkProfile.cis.rawValue
+
     @Option(name: .shortAndLong, help: "CIS profile level (1 or 2).")
     var level: Int = 1
 
@@ -19,7 +22,7 @@ struct Scan: AsyncParsableCommand {
     @Flag(name: .long, help: "Output results as JSON.")
     var json: Bool = false
 
-    @Option(name: .shortAndLong, help: "Run only checks matching this category (access_security, firewall_sharing, updates, system_integrity).")
+    @Option(name: .shortAndLong, help: "Run only checks matching this category (see 'armazi list' for the categories in a profile).")
     var category: String?
 
     @Option(name: .long, help: "Run only a specific check by ID.")
@@ -43,7 +46,7 @@ struct Scan: AsyncParsableCommand {
         if let path = benchmark {
             benchmarkDef = try BenchmarkParser.parse(fileURL: URL(fileURLWithPath: path))
         } else {
-            benchmarkDef = try BenchmarkParser.loadBundled()
+            benchmarkDef = try BenchmarkParser.loadBundled(profile: ProfileOption.parse(profile))
         }
 
         if watch {
@@ -59,7 +62,8 @@ struct Scan: AsyncParsableCommand {
         }
 
         let runner = CheckRunner()
-        let report = await runner.run(benchmark: filtered(benchmarkDef), level: level)
+        let scoped = try filtered(benchmarkDef)
+        let report = await runner.run(benchmark: scoped, level: level)
 
         if json {
             CLIReporter.printJSON(report)
@@ -83,7 +87,8 @@ struct Scan: AsyncParsableCommand {
             CLIReporter.printHeader(benchmarkDef)
 
             let runner = CheckRunner()
-            let report = await runner.run(benchmark: filtered(benchmarkDef), level: level)
+            let scoped = try filtered(benchmarkDef)
+            let report = await runner.run(benchmark: scoped, level: level)
 
             CLIReporter.printReport(report, verbose: verbose)
 
@@ -112,10 +117,16 @@ struct Scan: AsyncParsableCommand {
         }
     }
 
-    private func filtered(_ benchmarkDef: BenchmarkDefinition) -> BenchmarkDefinition {
+    private func filtered(_ benchmarkDef: BenchmarkDefinition) throws -> BenchmarkDefinition {
         var checks = benchmarkDef.checks
 
-        if let cat = category, let category = CheckCategory(rawValue: cat) {
+        if let cat = category {
+            guard let category = CheckCategory(rawValue: cat) else {
+                let available = Set(benchmarkDef.checks.map(\.category.rawValue)).sorted()
+                throw ValidationError(
+                    "Unknown category '\(cat)'. Categories in this profile: \(available.joined(separator: ", "))"
+                )
+            }
             checks = checks.filter { $0.category == category }
         }
 

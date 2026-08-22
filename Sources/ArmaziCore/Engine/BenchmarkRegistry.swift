@@ -74,8 +74,12 @@ public enum BenchmarkRegistry {
     ]
 
     /// Get the best benchmark for the current platform.
-    public static func loadForCurrentPlatform() throws -> BenchmarkDefinition {
+    public static func loadForCurrentPlatform(profile: BenchmarkProfile = .cis) throws -> BenchmarkDefinition {
         let platform = Platform.detect()
+
+        if profile == .personal {
+            return try loadPersonalProtection(platform: platform)
+        }
 
         // 1. Check for local override matching this platform
         let localFile = BenchmarkParser.localDir
@@ -99,6 +103,24 @@ public enum BenchmarkRegistry {
         throw BenchmarkError.bundledFileNotFound(
             "No benchmark found for \(platform.description). Run 'armazi update-benchmarks' to download one."
         )
+    }
+
+    /// Load the Personal Protection profile.
+    /// Priority: local override → embedded default (macOS only).
+    private static func loadPersonalProtection(platform: Platform) throws -> BenchmarkDefinition {
+        let localFile = BenchmarkParser.localDir
+            .appendingPathComponent(BenchmarkProfile.personal.localFilename)
+        if FileManager.default.fileExists(atPath: localFile.path) {
+            return try BenchmarkParser.parse(fileURL: localFile)
+        }
+
+        guard platform.os == .macOS else {
+            throw BenchmarkError.bundledFileNotFound(
+                "The Personal Protection profile is macOS-only. Detected \(platform.description)."
+            )
+        }
+
+        return try BenchmarkParser.parse(yaml: EmbeddedBenchmarks.personalProtectionMacOS)
     }
 
     /// List available sources for the detected platform.
