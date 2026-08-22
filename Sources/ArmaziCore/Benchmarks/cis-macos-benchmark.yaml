@@ -432,6 +432,21 @@ checks:
     remediation: "System Settings > General > Sharing > Remote Management → Off. Or run: sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -deactivate -stop"
     frameworks: ["cis", "essentials"]
 
+  - id: "2.10"
+    title: "Firewall stealth mode is on"
+    description: "Do not respond to probes from untrusted networks such as public Wi-Fi."
+    category: "firewall_sharing"
+    level: 1
+    scored: true
+    elevated: true
+    audit:
+      command: "/usr/libexec/ApplicationFirewall/socketfilterfw --getstealthmode 2>&1"
+      match:
+        type: "contains"
+        value: "enabled"
+    remediation: "System Settings > Network > Firewall > Options > Enable stealth mode. Or run: sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setstealthmode on"
+    frameworks: ["cis", "iso", "essentials"]
+
   # ──────────────────────────────────────────────
   # macOS Updates
   # ──────────────────────────────────────────────
@@ -495,6 +510,27 @@ checks:
         type: "contains"
         value: "PASS"
     remediation: "System Settings > General > Software Update > Automatic Updates → Turn on Check for updates and Download new updates"
+    frameworks: ["cis", "iso", "nist-csf", "essentials", "soc"]
+
+  - id: "3.4"
+    title: "Security responses install automatically"
+    description: "Install Rapid Security Responses and system data files without waiting for a full macOS update."
+    category: "updates"
+    level: 1
+    scored: true
+    audit:
+      command: |
+        config=$(defaults read /Library/Preferences/com.apple.SoftwareUpdate ConfigDataInstall 2>/dev/null)
+        critical=$(defaults read /Library/Preferences/com.apple.SoftwareUpdate CriticalUpdateInstall 2>/dev/null)
+        if [ "$config" = "1" ] && [ "$critical" = "1" ]; then
+          echo "PASS: security responses and system data files install automatically"
+        else
+          echo "FAIL: not enabled (system data files=${config:-unset}, security responses=${critical:-unset})"
+        fi
+      match:
+        type: "contains"
+        value: "PASS"
+    remediation: "System Settings > General > Software Update > Automatic Updates → turn on 'Install Security Responses and system files'"
     frameworks: ["cis", "iso", "nist-csf", "essentials", "soc"]
 
   # ──────────────────────────────────────────────
@@ -642,3 +678,493 @@ checks:
         value: "PASS"
     remediation: "Connect to a Wi-Fi network that uses WPA2 or WPA3 encryption."
     frameworks: ["iso"]
+
+  - id: "4.7"
+    title: "System Integrity Protection is on"
+    description: "SIP prevents malware from modifying protected system files and is the base layer of macOS malware defence."
+    category: "system_integrity"
+    level: 1
+    scored: true
+    audit:
+      command: "csrutil status 2>&1"
+      match:
+        type: "contains"
+        value: "enabled"
+    remediation: "Restart into Recovery Mode > Utilities > Terminal, then run: csrutil enable"
+    frameworks: ["cis", "iso", "nist-csf", "essentials", "soc"]
+
+  - id: "4.8"
+    title: "Malware definitions are current"
+    description: "XProtect signatures must be recent for macOS to block known malware."
+    category: "system_integrity"
+    level: 1
+    scored: true
+    audit:
+      command: |
+        meta="/Library/Apple/System/Library/CoreServices/XProtect.bundle/Contents/Info.plist"
+        [ -f "$meta" ] || meta="/System/Library/CoreServices/XProtect.bundle/Contents/Info.plist"
+        if [ ! -f "$meta" ]; then
+          echo "WARNING: XProtect was not found on this system"
+        else
+          version=$(defaults read "${meta%.plist}" CFBundleShortVersionString 2>/dev/null)
+          if [ -n "$(find "$meta" -mtime -90 2>/dev/null)" ]; then
+            echo "PASS: XProtect definitions updated in the last 90 days (version ${version:-unknown})"
+          else
+            echo "FAIL: XProtect definitions are older than 90 days (version ${version:-unknown})"
+          fi
+        fi
+      match:
+        type: "contains"
+        value: "PASS"
+    remediation: "Enable 'Install Security Responses and system files' in System Settings > General > Software Update > Automatic Updates, then run: sudo softwareupdate --background-critical"
+    frameworks: ["cis", "iso", "nist-csf", "essentials"]
+
+  # ──────────────────────────────────────────────
+  # Identity & Accounts
+  # ──────────────────────────────────────────────
+
+  - id: "5.1"
+    title: "Login keychain locks when the Mac sleeps"
+    description: "Lock the login keychain on sleep so saved passwords are not readable on an unattended Mac."
+    category: "identity_protection"
+    level: 1
+    scored: true
+    audit:
+      command: |
+        info=$(security show-keychain-info "$HOME/Library/Keychains/login.keychain-db" 2>&1)
+        if echo "$info" | grep -q "lock-on-sleep"; then
+          echo "PASS: login keychain locks when the Mac sleeps"
+        elif echo "$info" | grep -qE "timeout|no-timeout"; then
+          echo "FAIL: login keychain stays unlocked while the Mac sleeps"
+        else
+          echo "WARNING: could not read login keychain settings"
+        fi
+      match:
+        type: "contains"
+        value: "PASS"
+    remediation: "Keychain Access > right-click the 'login' keychain > Change Settings for Keychain 'login' > enable 'Lock when sleeping'"
+    frameworks: ["cis", "iso", "nist-csf"]
+
+  - id: "5.2"
+    title: "Login keychain locks after inactivity"
+    description: "Re-lock the login keychain after an idle period so saved credentials are not left exposed."
+    category: "identity_protection"
+    level: 2
+    scored: true
+    audit:
+      command: |
+        info=$(security show-keychain-info "$HOME/Library/Keychains/login.keychain-db" 2>&1)
+        if echo "$info" | grep -q "no-timeout"; then
+          echo "FAIL: login keychain never locks on inactivity"
+        elif echo "$info" | grep -q "timeout="; then
+          echo "PASS: login keychain locks after an idle timeout"
+        else
+          echo "WARNING: could not read login keychain settings"
+        fi
+      match:
+        type: "contains"
+        value: "PASS"
+    remediation: "Keychain Access > right-click the 'login' keychain > Change Settings for Keychain 'login' > enable 'Lock after N minutes of inactivity'"
+    frameworks: ["cis", "iso"]
+
+  - id: "5.3"
+    title: "Find My Mac is enabled"
+    description: "Enable Find My Mac so a lost or stolen machine can be located, locked, and wiped remotely."
+    category: "identity_protection"
+    level: 1
+    scored: true
+    elevated: true
+    audit:
+      command: |
+        enabled=$(defaults read /Library/Preferences/com.apple.FindMyMac FMMEnabled 2>/dev/null)
+        if [ "$enabled" = "1" ]; then
+          echo "PASS: Find My Mac is enabled"
+        elif [ -z "$enabled" ]; then
+          echo "WARNING: could not read the Find My Mac setting"
+        else
+          echo "FAIL: Find My Mac is off — a lost Mac cannot be located or wiped remotely"
+        fi
+      match:
+        type: "contains"
+        value: "PASS"
+    remediation: "System Settings > [your name] > iCloud > Find My Mac → On"
+    frameworks: ["cis", "iso", "nist-csf", "essentials"]
+
+  - id: "5.4"
+    title: "Touch ID is enrolled for unlock"
+    description: "Use biometrics as a second factor for unlocking and for authorizing administrator actions."
+    category: "identity_protection"
+    level: 2
+    scored: false
+    audit:
+      command: |
+        if ! command -v bioutil >/dev/null 2>&1; then
+          echo "WARNING: bioutil is not available on this system"
+          exit 0
+        fi
+        info=$(bioutil -r 2>&1)
+        if echo "$info" | grep -qi "unlock: 1"; then
+          echo "PASS: Touch ID is enrolled for unlock"
+        elif echo "$info" | grep -qi "functionality: 0"; then
+          echo "WARNING: this Mac has no Touch ID hardware"
+        else
+          echo "WARNING: Touch ID is not enrolled for unlock"
+        fi
+      match:
+        type: "contains"
+        value: "PASS"
+    remediation: "System Settings > Touch ID & Password > Add Fingerprint, then enable 'Use Touch ID to unlock your Mac'"
+    frameworks: ["cis", "nist-csf"]
+
+  - id: "5.5"
+    title: "Guest account is off"
+    description: "Disable the Guest account so nobody can log in without credentials."
+    category: "identity_protection"
+    level: 1
+    scored: true
+    audit:
+      command: |
+        guest=$(defaults read /Library/Preferences/com.apple.loginwindow GuestEnabled 2>/dev/null)
+        if [ "$guest" = "1" ]; then
+          echo "FAIL: the Guest account is enabled"
+        else
+          echo "PASS: the Guest account is disabled"
+        fi
+      match:
+        type: "contains"
+        value: "PASS"
+    remediation: "System Settings > Users & Groups > Guest User → Off. Or run: sudo defaults write /Library/Preferences/com.apple.loginwindow GuestEnabled -bool false"
+    frameworks: ["cis", "iso", "essentials", "soc"]
+
+  # ──────────────────────────────────────────────
+  # Backup & Data
+  # ──────────────────────────────────────────────
+
+  - id: "6.1"
+    title: "A backup destination is configured"
+    description: "Keep at least one Time Machine destination so files can be restored after loss or ransomware."
+    category: "data_protection"
+    level: 1
+    scored: true
+    audit:
+      command: |
+        info=$(tmutil destinationinfo 2>&1)
+        if echo "$info" | grep -qi "no destinations"; then
+          echo "FAIL: no Time Machine destination is configured"
+        elif echo "$info" | grep -q "^Name"; then
+          count=$(echo "$info" | grep -c "^Name")
+          echo "PASS: $count backup destination(s) configured"
+        else
+          echo "WARNING: could not determine backup destinations"
+        fi
+      match:
+        type: "contains"
+        value: "PASS"
+    remediation: "System Settings > General > Time Machine > Add Backup Disk"
+    frameworks: ["cis", "iso", "nist-csf", "soc"]
+
+  - id: "6.2"
+    title: "A backup completed in the last 7 days"
+    description: "A backup destination is only useful if backups actually run — verify a recent completed backup."
+    category: "data_protection"
+    level: 1
+    scored: false
+    audit:
+      command: |
+        latest=$(tmutil latestbackup 2>/dev/null)
+        day=$(echo "$latest" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | tail -1)
+        if [ -z "$day" ]; then
+          echo "WARNING: no completed backup found (Full Disk Access may be required to read backup history)"
+          exit 0
+        fi
+        epoch=$(date -j -f "%Y-%m-%d" "$day" +%s 2>/dev/null)
+        if [ -z "$epoch" ]; then
+          echo "WARNING: could not parse the last backup date"
+          exit 0
+        fi
+        age=$(( ( $(date +%s) - epoch ) / 86400 ))
+        if [ "$age" -le 7 ]; then
+          echo "PASS: last backup completed $age day(s) ago"
+        else
+          echo "WARNING: last backup completed $age day(s) ago"
+        fi
+      match:
+        type: "contains"
+        value: "PASS"
+    remediation: "Connect the backup disk and run: tmutil startbackup. Enable 'Back Up Automatically' in System Settings > General > Time Machine."
+    frameworks: ["iso", "nist-csf", "soc"]
+
+  - id: "6.3"
+    title: "Local snapshots are available for rollback"
+    description: "Time Machine local snapshots allow rolling files back after corruption or a ransomware event."
+    category: "data_protection"
+    level: 2
+    scored: false
+    audit:
+      command: |
+        count=$(tmutil listlocalsnapshots / 2>/dev/null | grep -c "com.apple.TimeMachine")
+        if [ "$count" -gt 0 ]; then
+          echo "PASS: $count local snapshot(s) available for rollback"
+        else
+          echo "WARNING: no local snapshots are available on the boot volume"
+        fi
+      match:
+        type: "contains"
+        value: "PASS"
+    remediation: "Enable Time Machine — macOS then keeps hourly local snapshots automatically. Verify with: tmutil listlocalsnapshots /"
+    frameworks: ["iso", "nist-csf"]
+
+  - id: "6.4"
+    title: "Desktop and Documents sync to iCloud Drive"
+    description: "A versioned cloud copy of working files gives a second recovery path when local files are lost."
+    category: "data_protection"
+    level: 2
+    scored: false
+    audit:
+      command: |
+        pref=$(defaults read com.apple.finder FXICloudDriveDesktop 2>/dev/null)
+        if [ "$pref" = "1" ] || [ -d "$HOME/Library/Mobile Documents/com~apple~CloudDocs/Desktop" ]; then
+          echo "PASS: Desktop and Documents sync to iCloud Drive"
+        else
+          echo "WARNING: Desktop and Documents are not synced to iCloud Drive"
+        fi
+      match:
+        type: "contains"
+        value: "PASS"
+    remediation: "System Settings > [your name] > iCloud > iCloud Drive > Desktop & Documents Folders → On"
+    frameworks: ["iso", "soc"]
+
+  - id: "6.5"
+    title: "Home folder is not readable by other users"
+    description: "Restrict the home folder so other local accounts cannot read personal files."
+    category: "data_protection"
+    level: 2
+    scored: true
+    audit:
+      command: |
+        perms=$(stat -f '%Sp' "$HOME" 2>/dev/null)
+        case "$perms" in
+          drwx------*) echo "PASS: home folder is private ($perms)" ;;
+          "") echo "WARNING: could not read home folder permissions" ;;
+          *) echo "FAIL: home folder is readable by other local users ($perms)" ;;
+        esac
+      match:
+        type: "contains"
+        value: "PASS"
+    remediation: "chmod 700 \"$HOME\""
+    frameworks: ["cis", "iso", "soc"]
+
+  # ──────────────────────────────────────────────
+  # Privacy & Online Safety
+  # ──────────────────────────────────────────────
+
+  - id: "7.1"
+    title: "Diagnostic data is not shared with Apple"
+    description: "Stop sending crash and usage reports, which can contain fragments of personal data."
+    category: "privacy"
+    level: 2
+    scored: false
+    audit:
+      command: |
+        auto=$(defaults read "/Library/Application Support/CrashReporter/DiagnosticMessagesHistory" AutoSubmit 2>/dev/null)
+        if [ "$auto" = "0" ]; then
+          echo "PASS: diagnostic data is not sent to Apple"
+        elif [ "$auto" = "1" ]; then
+          echo "WARNING: diagnostic and usage data is sent to Apple"
+        else
+          echo "WARNING: could not read the diagnostic data setting"
+        fi
+      match:
+        type: "contains"
+        value: "PASS"
+    remediation: "System Settings > Privacy & Security > Analytics & Improvements > Share Mac Analytics → Off"
+    frameworks: ["iso", "soc"]
+
+  - id: "7.2"
+    title: "Personalized advertising is off"
+    description: "Disable ad targeting so app and account activity is not profiled for advertising."
+    category: "privacy"
+    level: 2
+    scored: false
+    audit:
+      command: |
+        ads=$(defaults read com.apple.AdLib allowApplePersonalizedAdvertising 2>/dev/null)
+        if [ "$ads" = "0" ]; then
+          echo "PASS: personalized advertising is off"
+        elif [ "$ads" = "1" ]; then
+          echo "WARNING: personalized advertising is on"
+        else
+          echo "WARNING: could not read the personalized advertising setting"
+        fi
+      match:
+        type: "contains"
+        value: "PASS"
+    remediation: "System Settings > Privacy & Security > Apple Advertising > Personalized Ads → Off"
+    frameworks: ["iso"]
+
+  - id: "7.3"
+    title: "Safari warns about fraudulent websites"
+    description: "Keep Safari's phishing and malware site warnings enabled."
+    category: "privacy"
+    level: 1
+    scored: false
+    audit:
+      command: |
+        warn=$(defaults read com.apple.Safari WarnAboutFraudulentWebsites 2>/dev/null)
+        if [ "$warn" = "1" ]; then
+          echo "PASS: Safari warns about fraudulent websites"
+        elif [ "$warn" = "0" ]; then
+          echo "WARNING: Safari fraudulent website warnings are off"
+        else
+          echo "WARNING: could not read Safari settings (Safari preferences need Full Disk Access to read)"
+        fi
+      match:
+        type: "contains"
+        value: "PASS"
+    remediation: "Safari > Settings > Security > 'Warn when visiting a fraudulent website' → On"
+    frameworks: ["cis", "essentials"]
+
+  - id: "7.4"
+    title: "Safari does not auto-open downloads"
+    description: "Downloaded archives and disk images should not open automatically without review."
+    category: "privacy"
+    level: 1
+    scored: false
+    audit:
+      command: |
+        auto=$(defaults read com.apple.Safari AutoOpenSafeDownloads 2>/dev/null)
+        if [ "$auto" = "0" ]; then
+          echo "PASS: Safari does not open downloads automatically"
+        elif [ "$auto" = "1" ]; then
+          echo "WARNING: Safari opens 'safe' downloads automatically"
+        else
+          echo "WARNING: could not read Safari settings (Safari preferences need Full Disk Access to read)"
+        fi
+      match:
+        type: "contains"
+        value: "PASS"
+    remediation: "Safari > Settings > General > 'Open \"safe\" files after downloading' → Off"
+    frameworks: ["cis", "essentials"]
+
+  - id: "7.5"
+    title: "A VPN configuration is available"
+    description: "A configured VPN protects traffic on untrusted networks such as public Wi-Fi."
+    category: "privacy"
+    level: 2
+    scored: false
+    audit:
+      command: |
+        count=$(scutil --nc list 2>/dev/null | grep -ciE "ipsec|l2tp|vpn|ppp")
+        if [ "$count" -gt 0 ]; then
+          echo "PASS: $count VPN configuration(s) found"
+        else
+          echo "WARNING: no VPN configuration found (an app-managed VPN may not appear here)"
+        fi
+      match:
+        type: "contains"
+        value: "PASS"
+    remediation: "System Settings > Network > VPN — add a VPN configuration, or install your provider's app."
+    frameworks: ["iso", "nist-csf"]
+
+  # ──────────────────────────────────────────────
+  # Network & IoT
+  # ──────────────────────────────────────────────
+
+  - id: "8.1"
+    title: "No open Wi-Fi networks are remembered"
+    description: "Remembered open networks are auto-joined, exposing traffic to anyone running the same SSID."
+    category: "network_protection"
+    level: 1
+    scored: true
+    elevated: true
+    audit:
+      command: |
+        plist="/Library/Preferences/com.apple.wifi.known-networks.plist"
+        if [ ! -f "$plist" ]; then
+          echo "WARNING: the known networks list was not found on this macOS version"
+        elif ! plutil -p "$plist" 2>/dev/null | grep -q "SupportedSecurityTypes"; then
+          echo "WARNING: could not read security types from the known networks list"
+        else
+          open_count=$(plutil -p "$plist" 2>/dev/null | grep -ciE '"SupportedSecurityTypes" => "(Open|None)"')
+          if [ "$open_count" -eq 0 ]; then
+            echo "PASS: no open Wi-Fi networks are remembered"
+          else
+            echo "FAIL: $open_count remembered Wi-Fi network(s) are unencrypted"
+          fi
+        fi
+      match:
+        type: "contains"
+        value: "PASS"
+    remediation: "System Settings > Wi-Fi > Advanced — remove any open network from Known Networks."
+    frameworks: ["cis", "iso", "essentials"]
+
+  - id: "8.2"
+    title: "DNS does not rely on the router default"
+    description: "A filtering or encrypted DNS resolver blocks known malicious domains before a connection is made."
+    category: "network_protection"
+    level: 2
+    scored: false
+    audit:
+      command: |
+        gateway=$(route -n get default 2>/dev/null | awk '/gateway:/{print $2}')
+        resolver=$(scutil --dns 2>/dev/null | awk '/nameserver\[0\]/{print $3; exit}')
+        if [ -z "$resolver" ]; then
+          echo "WARNING: no DNS resolver is configured"
+        elif [ -n "$gateway" ] && [ "$resolver" = "$gateway" ]; then
+          echo "WARNING: using the router's default DNS resolver ($resolver) — no malicious-domain filtering"
+        else
+          echo "PASS: a dedicated DNS resolver is configured ($resolver)"
+        fi
+      match:
+        type: "contains"
+        value: "PASS"
+    remediation: "System Settings > Network > [interface] > Details > DNS — add a filtering resolver, or install an encrypted DNS profile."
+    frameworks: ["iso", "nist-csf"]
+
+  - id: "8.3"
+    title: "No services listen on all network interfaces"
+    description: "Services bound to every interface are reachable from the local network, not just this Mac."
+    category: "network_protection"
+    level: 2
+    scored: false
+    audit:
+      command: |
+        ports=$(netstat -an -p tcp 2>/dev/null | awk '$NF == "LISTEN" && ($4 ~ /^\*\./ || $4 ~ /^0\.0\.0\.0\./) {print $4}' | sort -u)
+        count=$(echo "$ports" | grep -c '[0-9]')
+        if [ "$count" -eq 0 ]; then
+          echo "PASS: no TCP service listens on all interfaces"
+        else
+          echo "WARNING: $count TCP port(s) listening on all interfaces: $(echo "$ports" | tr '\n' ' ')"
+        fi
+      match:
+        type: "contains"
+        value: "PASS"
+    remediation: "Turn off the sharing services you do not need in System Settings > General > Sharing, and bind development servers to 127.0.0.1."
+    frameworks: ["cis", "iso", "essentials"]
+
+  - id: "8.4"
+    title: "Bluetooth is off when nothing is connected"
+    description: "Leaving Bluetooth on with no connected devices widens the wireless attack surface."
+    category: "network_protection"
+    level: 2
+    scored: false
+    audit:
+      command: |
+        power=$(defaults read /Library/Preferences/com.apple.Bluetooth ControllerPowerState 2>/dev/null)
+        if [ "$power" = "0" ]; then
+          echo "PASS: Bluetooth is off"
+        elif [ -z "$power" ]; then
+          echo "WARNING: could not read the Bluetooth power state"
+        else
+          connected=$(system_profiler SPBluetoothDataType 2>/dev/null | grep -c "Connected: Yes")
+          if [ "$connected" -gt 0 ]; then
+            echo "PASS: Bluetooth is on with $connected connected device(s)"
+          else
+            echo "WARNING: Bluetooth is on with no connected devices"
+          fi
+        fi
+      match:
+        type: "contains"
+        value: "PASS"
+    remediation: "Turn Bluetooth off in Control Center or System Settings > Bluetooth when no devices are in use."
+    frameworks: ["cis", "iso"]

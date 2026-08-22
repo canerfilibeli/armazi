@@ -19,7 +19,7 @@ struct Scan: AsyncParsableCommand {
     @Flag(name: .long, help: "Output results as JSON.")
     var json: Bool = false
 
-    @Option(name: .shortAndLong, help: "Run only checks matching this category (access_security, firewall_sharing, updates, system_integrity).")
+    @Option(name: .shortAndLong, help: "Run only checks matching this category. Run 'armazi list' to see the categories in the loaded benchmark.")
     var category: String?
 
     @Option(name: .long, help: "Run only a specific check by ID.")
@@ -33,6 +33,13 @@ struct Scan: AsyncParsableCommand {
 
     @Flag(name: .long, help: "Skip the automatic update check.")
     var skipUpdate: Bool = false
+
+    func validate() throws {
+        if let cat = category, CheckCategory(rawValue: cat) == nil {
+            let known = CheckCategory.allCases.map(\.rawValue).joined(separator: ", ")
+            throw ValidationError("Unknown category '\(cat)'. Valid categories: \(known)")
+        }
+    }
 
     func run() async throws {
         if !skipUpdate && !json {

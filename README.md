@@ -65,6 +65,10 @@ armazi scan --category access_security
 armazi scan --category firewall_sharing
 armazi scan --category updates
 armazi scan --category system_integrity
+armazi scan --category identity_protection
+armazi scan --category data_protection
+armazi scan --category privacy
+armazi scan --category network_protection
 ```
 
 **Run a single check:**
@@ -105,13 +109,20 @@ Example output:
 ```
 Armazi Security Status
 
-66% — 18 passed, 7 failed out of 27 checks
+69% — 27 passed, 12 failed out of 39 checks
 
-○ Access Security        7/9
-○ Firewall & Sharing     8/9
-○ macOS Updates          1/3
-○ System Integrity       2/6
+○ Access Security          7/9
+○ Firewall & Sharing       8/10
+○ macOS Updates            1/4
+○ System Integrity         5/8
+○ Identity & Accounts      3/3
+○ Backup & Data            2/2
+○ Privacy & Online Safety  0/2
+○ Network & IoT            1/1
 ```
+
+At the default profile level, 39 of the 50 bundled checks run — pass `--level 2`
+to include the stricter ones.
 
 ---
 
@@ -166,7 +177,7 @@ armazi import benchmark.xml --install   # convert and install for immediate use
 
 ## What It Checks
 
-Ships with a built-in **CIS macOS Benchmark** covering 27 checks across four categories:
+Ships with a built-in **CIS macOS Benchmark** covering 50 checks across eight categories:
 
 ### Access Security (9 checks)
 
@@ -182,7 +193,7 @@ Ships with a built-in **CIS macOS Benchmark** covering 27 checks across four cat
 | SSH keys require a password | Protect private keys |
 | SSH keys use strong encryption | Ed25519 or RSA ≥3072-bit |
 
-### Firewall & Sharing (9 checks)
+### Firewall & Sharing (10 checks)
 
 | Check | Description |
 |---|---|
@@ -190,30 +201,73 @@ Ships with a built-in **CIS macOS Benchmark** covering 27 checks across four cat
 | AirPlay Receiver is off | No unauthorized streaming |
 | File Sharing is off | SMB disabled |
 | Firewall is on | Block unauthorized connections |
+| Firewall stealth mode is on | Ignore probes on public Wi-Fi |
 | Internet Sharing is off | Mac not acting as router |
 | Media Sharing is off | Library not exposed |
 | Printer Sharing is off | Reduce attack surface |
 | Remote Login is off | SSH disabled |
 | Remote Management is off | ARD disabled |
 
-### macOS Updates (3 checks)
+### macOS Updates (4 checks)
 
 | Check | Description |
 |---|---|
 | App Store updates automatic | Keep apps patched |
 | Application updates automatic | Auto-install app updates |
 | macOS updates automatic | Receive security patches |
+| Security responses automatic | Rapid Security Responses and system data files |
 
-### System Integrity (6 checks)
+### System Integrity (8 checks)
 
 | Check | Description |
 |---|---|
 | Boot is secure | Full Security boot policy |
 | FileVault is on | Disk encryption enabled |
 | Gatekeeper is on | Block non-notarized apps |
+| Malware definitions are current | XProtect updated in the last 90 days |
+| System Integrity Protection is on | Protected system files cannot be modified |
 | Terminal secure keyboard entry | Prevent keystroke interception |
 | Time Machine encrypted | Secure backups |
 | Wi-Fi connection secure | WPA2/WPA3 encryption |
+
+### Identity & Accounts (5 checks)
+
+| Check | Description |
+|---|---|
+| Find My Mac is enabled | Locate, lock, and wipe a lost Mac |
+| Guest account is off | No login without credentials |
+| Keychain locks after inactivity | Saved credentials re-lock when idle |
+| Keychain locks on sleep | Saved passwords are not readable on an unattended Mac |
+| Touch ID enrolled for unlock | Biometric second factor |
+
+### Backup & Data (5 checks)
+
+| Check | Description |
+|---|---|
+| Backup completed in last 7 days | Backups actually run, not just configured |
+| Backup destination configured | Recover files after loss or ransomware |
+| Desktop and Documents in iCloud Drive | Second, versioned recovery path |
+| Home folder is private | Other local users cannot read personal files |
+| Local snapshots available | Roll files back after corruption |
+
+### Privacy & Online Safety (5 checks)
+
+| Check | Description |
+|---|---|
+| Diagnostic data not shared | No crash and usage reports sent to Apple |
+| Personalized advertising is off | Activity is not profiled for ads |
+| Safari does not auto-open downloads | Archives and images are reviewed first |
+| Safari warns about fraudulent sites | Phishing and malware site warnings |
+| VPN configuration available | Protect traffic on untrusted networks |
+
+### Network & IoT (4 checks)
+
+| Check | Description |
+|---|---|
+| Bluetooth off when unused | Narrow the wireless attack surface |
+| DNS not left at router default | Filter malicious domains before connecting |
+| No open Wi-Fi remembered | No silent auto-join of unencrypted networks |
+| No services on all interfaces | Nothing exposed to the rest of the LAN |
 
 ---
 
@@ -265,6 +319,22 @@ Run it with:
 armazi scan --benchmark my-benchmark.yaml
 ```
 
+### Categories
+
+Every check belongs to one category. Custom benchmarks may use any subset —
+categories with no checks are hidden from the CLI and the GUI sidebar.
+
+| Value | Displayed as |
+|---|---|
+| `access_security` | Access Security |
+| `firewall_sharing` | Firewall & Sharing |
+| `updates` | macOS Updates |
+| `system_integrity` | System Integrity |
+| `identity_protection` | Identity & Accounts |
+| `data_protection` | Backup & Data |
+| `privacy` | Privacy & Online Safety |
+| `network_protection` | Network & IoT |
+
 ### Match Rules
 
 | Type | Description | Example |
@@ -315,6 +385,10 @@ Sources/
 └── Armazi/              # SwiftUI macOS GUI application
     ├── Views/           # Dashboard, category detail, report, score ring
     └── ViewModels/      # DashboardViewModel
+
+Scripts/
+├── embed_benchmarks.py   # regenerate the embedded benchmark (CI checks sync)
+└── validate_benchmark.py # validate benchmark YAML before the Swift parser
 ```
 
 `ArmaziCore` is a standalone library used by both the CLI and the GUI app.
@@ -340,6 +414,11 @@ To report a security vulnerability, please open an issue on GitHub.
 
 ## Roadmap
 
+[docs/Protection_Roadmap.md](docs/Protection_Roadmap.md) maps what people
+actually want from a personal security product — identity, devices, data, home
+network, family — onto what Armazi covers today, what is planned, and what a
+local auditor deliberately leaves to other tools.
+
 - [ ] **macOS .app bundle** — double-click to launch, Dock icon, notarization
 - [ ] **Menu bar agent** — background process showing security score in the menu bar
 - [ ] **One-click remediation** — "Fix" button in GUI that applies the recommended fix
@@ -363,7 +442,13 @@ Contributions are welcome. The easiest way to contribute is by adding or improvi
 1. Fork the repository
 2. Edit `Sources/ArmaziCore/Benchmarks/cis-macos-benchmark.yaml`
 3. Test the audit command in Terminal first
-4. Submit a pull request
+4. Validate the file: `python3 Scripts/validate_benchmark.py`
+5. Regenerate the embedded copy: `python3 Scripts/embed_benchmarks.py`
+6. Submit a pull request
+
+The bundled benchmark is embedded in the binary as a Swift string literal
+(`Sources/ArmaziCore/Engine/EmbeddedBenchmarks.swift`) so releases stay
+self-contained. That file is generated — CI fails if it drifts from the YAML.
 
 See [Development_Guide.md](Development_Guide.md) for build instructions and coding conventions.
 

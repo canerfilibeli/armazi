@@ -66,7 +66,7 @@ struct DashboardView: View {
             }
 
             Section("Categories") {
-                ForEach(CheckCategory.allCases) { category in
+                ForEach(viewModel.activeCategories) { category in
                     categoryRow(category)
                         .tag(category)
                 }

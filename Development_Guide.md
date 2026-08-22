@@ -34,7 +34,33 @@ swift test                # run tests (requires Xcode)
 1. Edit `Sources/ArmaziCore/Benchmarks/cis-macos-benchmark.yaml`
 2. Add a new entry following the existing format
 3. Test the audit command manually in Terminal first
-4. The check will automatically appear in the UI after rebuild
+4. Validate the file: `python3 Scripts/validate_benchmark.py`
+5. Regenerate the embedded copy: `python3 Scripts/embed_benchmarks.py`
+6. The check will automatically appear in the UI after rebuild
+
+Audit scripts should degrade gracefully: when a setting cannot be read (a
+missing plist, a TCC restriction, hardware that does not exist), print a
+`WARNING:` line rather than a false `FAIL`. Use `scored: false` for checks whose
+result depends on user preference or on Full Disk Access.
+
+## Categories
+
+`CheckCategory` in `Sources/ArmaziCore/Models/CheckCategory.swift` is the single
+source of truth for category values, display names, icons and colors. The CLI
+and the GUI both iterate `CheckCategory.allCases` and skip categories with no
+checks, so adding a case is enough for it to appear everywhere. Keep the
+`CATEGORIES` set in `Scripts/validate_benchmark.py` in sync.
+
+## Scripts
+
+- `Scripts/embed_benchmarks.py` — regenerates
+  `Sources/ArmaziCore/Engine/EmbeddedBenchmarks.swift` from the benchmark YAML
+  so the binary stays self-contained. `--check` verifies the two are in sync and
+  runs in CI; stdlib only.
+- `Scripts/validate_benchmark.py` — validates benchmark YAML before the Swift
+  parser sees it: required keys, unique IDs, known categories, frameworks and
+  match types, and `sh -n` syntax checking of every audit command. Requires
+  PyYAML.
 
 ## Match rule types
 

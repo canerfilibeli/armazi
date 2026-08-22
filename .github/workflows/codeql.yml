@@ -16,6 +16,9 @@ jobs:
       - name: Swift version
         run: swift --version
 
+      - name: Check embedded benchmark is in sync
+        run: python3 Scripts/embed_benchmarks.py --check
+
       - name: Build all targets
         run: swift build
 

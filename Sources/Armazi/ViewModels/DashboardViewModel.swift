@@ -126,6 +126,12 @@ final class DashboardViewModel: ObservableObject {
         benchmark?.checks.filter { $0.category == category && $0.level <= selectedLevel } ?? []
     }
 
+    /// Categories the loaded benchmark actually covers — a custom benchmark
+    /// does not have to use every category.
+    var activeCategories: [CheckCategory] {
+        CheckCategory.allCases.filter { !checks(for: $0).isEmpty || !results(for: $0).isEmpty }
+    }
+
     var passCount: Int { report?.passCount ?? 0 }
     var failCount: Int { report?.failCount ?? 0 }
     var totalChecks: Int { report?.totalChecks ?? 0 }

@@ -34,7 +34,7 @@ struct Status: AsyncParsableCommand {
             let pct = Int(Double(pass) / Double(results.count) * 100)
             let color = pct >= 80 ? CLIReporter.green : (pct >= 50 ? CLIReporter.yellow : CLIReporter.red)
             let indicator = pct == 100 ? "\(CLIReporter.green)●\(CLIReporter.reset)" : "\(color)○\(CLIReporter.reset)"
-            print("  \(indicator) \(category.displayName.padding(toLength: 22, withPad: " ", startingAt: 0)) \(color)\(pass)/\(results.count)\(CLIReporter.reset)")
+            print("  \(indicator) \(category.displayName.padding(toLength: 24, withPad: " ", startingAt: 0)) \(color)\(pass)/\(results.count)\(CLIReporter.reset)")
         }
         print()
 
