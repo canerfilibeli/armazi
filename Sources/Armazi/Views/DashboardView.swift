@@ -14,6 +14,7 @@ struct DashboardView: View {
         .navigationTitle("Armazi")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
+                profilePicker
                 levelPicker
                 updateBenchmarksButton
                 importMenu
@@ -66,13 +67,20 @@ struct DashboardView: View {
             }
 
             Section("Categories") {
-                ForEach(CheckCategory.allCases) { category in
+                ForEach(populatedCategories) { category in
                     categoryRow(category)
                         .tag(category)
                 }
             }
         }
         .listStyle(.sidebar)
+    }
+
+    /// Only show categories the loaded profile actually contains.
+    private var populatedCategories: [CheckCategory] {
+        CheckCategory.allCases.filter { category in
+            !viewModel.checks(for: category).isEmpty || !viewModel.results(for: category).isEmpty
+        }
     }
 
     private var scoreCard: some View {
@@ -183,6 +191,19 @@ struct DashboardView: View {
     }
 
     // MARK: - Toolbar
+
+    private var profilePicker: some View {
+        Picker("Profile", selection: Binding(
+            get: { viewModel.profile },
+            set: { viewModel.selectProfile($0) }
+        )) {
+            ForEach(BenchmarkProfile.allCases) { profile in
+                Text(profile.displayName).tag(profile)
+            }
+        }
+        .frame(width: 200)
+        .help("Which bundled benchmark to scan against")
+    }
 
     private var levelPicker: some View {
         Picker("Level", selection: $viewModel.selectedLevel) {

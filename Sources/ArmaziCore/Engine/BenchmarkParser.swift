@@ -28,6 +28,12 @@ public enum BenchmarkParser {
         try BenchmarkRegistry.loadForCurrentPlatform()
     }
 
+    /// Load a bundled benchmark profile (CIS hardening or personal protection).
+    /// Priority: local override → embedded copy.
+    public static func loadBundled(profile: BenchmarkProfile) throws -> BenchmarkDefinition {
+        try BenchmarkRegistry.load(profile: profile)
+    }
+
     /// List locally available benchmark files.
     public static func listLocal() -> [String] {
         guard let contents = try? FileManager.default.contentsOfDirectory(

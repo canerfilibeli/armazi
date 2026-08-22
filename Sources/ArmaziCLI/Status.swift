@@ -9,9 +9,13 @@ struct Status: AsyncParsableCommand {
     @Option(name: .shortAndLong, help: "CIS profile level (1 or 2).")
     var level: Int = 1
 
+    @Option(name: .shortAndLong, help: BenchmarkLoading.profileHelp)
+    var profile: String = BenchmarkProfile.default.rawValue
+
     func run() async throws {
         await ArmaziCLI.checkForUpdates()
-        let benchmark = try BenchmarkParser.loadBundled()
+        let resolved = try BenchmarkLoading.resolve(profile)
+        let benchmark = try BenchmarkParser.loadBundled(profile: resolved)
         let runner = CheckRunner()
         let report = await runner.run(benchmark: benchmark, level: level)
 

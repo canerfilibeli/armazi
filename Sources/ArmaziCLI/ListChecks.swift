@@ -14,13 +14,11 @@ struct ListChecks: AsyncParsableCommand {
     @Option(name: .shortAndLong, help: "CIS profile level (1 or 2).")
     var level: Int = 1
 
+    @Option(name: .shortAndLong, help: BenchmarkLoading.profileHelp)
+    var profile: String = BenchmarkProfile.default.rawValue
+
     func run() async throws {
-        let benchmarkDef: BenchmarkDefinition
-        if let path = benchmark {
-            benchmarkDef = try BenchmarkParser.parse(fileURL: URL(fileURLWithPath: path))
-        } else {
-            benchmarkDef = try BenchmarkParser.loadBundled()
-        }
+        let benchmarkDef = try BenchmarkLoading.load(path: benchmark, profile: profile)
 
         let total = benchmarkDef.checks.filter { $0.level <= level }.count
         print()

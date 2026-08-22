@@ -39,9 +39,36 @@ sudo cp .build/release/armazi /usr/local/bin/
 ## Quick Start
 
 ```bash
-armazi                # run a full scan (default command)
-armazi status         # one-line security summary
+armazi                            # run a full scan (default command)
+armazi status                     # one-line security summary
+armazi scan --profile personal    # personal protection check-up
 ```
+
+---
+
+## Two Profiles
+
+Armazi ships two bundled benchmarks. Select one with `--profile` on `scan`,
+`status`, and `list`.
+
+| Profile | What it asks | Checks |
+|---|---|---|
+| `cis` (default) | Is this Mac hardened to the CIS Benchmark? | 27 |
+| `personal` | Am I, as a person, actually protected? | 51 |
+
+The **personal** profile covers identity and accounts, device and data
+security, online safety, the home network, privacy, and what happens when
+something goes wrong — including a check that baselines the devices on your
+network and flags new ones. It never asks for an administrator password.
+
+```bash
+armazi scan --profile personal
+armazi scan --profile personal --level 2   # include advanced checks
+armazi status --profile personal
+```
+
+See [docs/PERSONAL_PROTECTION.md](docs/PERSONAL_PROTECTION.md) for the full
+coverage map, including what a local auditor deliberately does not try to do.
 
 ---
 
@@ -52,19 +79,27 @@ armazi status         # one-line security summary
 Run all security checks against your system.
 
 ```bash
-armazi scan                  # full scan with colored output
-armazi scan --verbose        # include remediation steps for each failure
-armazi scan --json           # output results as JSON (for CI/CD pipelines)
-armazi scan --level 2        # use CIS Level 2 profile (stricter)
+armazi scan                     # full scan with colored output
+armazi scan --verbose           # include remediation steps for each failure
+armazi scan --json              # output results as JSON (for CI/CD pipelines)
+armazi scan --level 2           # use CIS Level 2 profile (stricter)
+armazi scan --profile personal  # personal protection check-up
 ```
 
 **Filter by category:**
 
 ```bash
-armazi scan --category access_security
+armazi scan --category access_security      # cis profile
 armazi scan --category firewall_sharing
 armazi scan --category updates
 armazi scan --category system_integrity
+
+armazi scan --profile personal --category identity_protection
+armazi scan --profile personal --category device_data
+armazi scan --profile personal --category online_safety
+armazi scan --profile personal --category home_network
+armazi scan --profile personal --category privacy_footprint
+armazi scan --profile personal --category response_readiness
 ```
 
 **Run a single check:**
@@ -122,6 +157,7 @@ List all checks in the loaded benchmark without running them.
 ```bash
 armazi list                          # list all Level 1 checks
 armazi list --level 2                # include Level 2 checks
+armazi list --profile personal       # list the personal protection checks
 armazi list --benchmark custom.yaml  # list checks from a custom file
 ```
 
@@ -166,7 +202,9 @@ armazi import benchmark.xml --install   # convert and install for immediate use
 
 ## What It Checks
 
-Ships with a built-in **CIS macOS Benchmark** covering 27 checks across four categories:
+Ships with two built-in benchmarks: the **CIS macOS Benchmark** (27 checks,
+four categories, the default) and **Personal Protection** (51 checks, six
+categories, `--profile personal`).
 
 ### Access Security (9 checks)
 
@@ -214,6 +252,30 @@ Ships with a built-in **CIS macOS Benchmark** covering 27 checks across four cat
 | Terminal secure keyboard entry | Prevent keystroke interception |
 | Time Machine encrypted | Secure backups |
 | Wi-Fi connection secure | WPA2/WPA3 encryption |
+
+### Personal Protection (51 checks)
+
+Run with `--profile personal`.
+
+| Category | Checks | Covers |
+|---|---|---|
+| Identity & Accounts | 10 | Password manager, MFA app, security keys, Apple Account 2FA, breach & dark web monitoring, SIM-swap protection, fraud monitoring, guest account, screen lock |
+| Device & Data | 12 | FileVault, backup configured / encrypted / recent, local snapshots for rollback, Find My Mac, versioned cloud storage, automatic security updates, malware definitions, app patching, endpoint agent, secure disposal |
+| Online Safety | 10 | Gatekeeper, fraudulent-site warnings, auto-opening downloads, cross-site tracking, content blocker, filtering DNS, VPN, Private Relay, message filtering, family protections |
+| Home & Network | 8 | Firewall, stealth mode, Wi-Fi encryption, **new devices on your network**, exposed remote-access ports, AirDrop discovery, IoT segmentation, router hardening |
+| Privacy & Footprint | 6 | Personalised ads, analytics sharing, Siri audio, encrypted messaging, data broker removal, social media audit |
+| Response Readiness | 5 | Account recovery preparation, identity theft response, monthly review, household coverage, work/personal separation |
+
+Checks that cannot be read from the machine — a carrier port-out PIN, a data
+broker opt-out — are **attested** rather than guessed. They report a warning
+until you confirm them:
+
+```bash
+mkdir -p ~/.config/armazi
+echo ID.10 >> ~/.config/armazi/attested.txt
+```
+
+Full details in [docs/PERSONAL_PROTECTION.md](docs/PERSONAL_PROTECTION.md).
 
 ---
 
@@ -275,6 +337,11 @@ armazi scan --benchmark my-benchmark.yaml
 | `regex` | Output matches a regular expression | `"enabled\|on"` |
 | `exit_code` | Command exit code equals the value | `"0"` |
 
+> **Tip:** pick a success token that cannot appear by accident. The bundled
+> personal profile matches on `ARMAZI_PASS`, because a check matching on `PASS`
+> would also match the word "**pass**word" in a failure message, and one
+> matching on `OK` would match "br**ok**en".
+
 ### Elevated Checks
 
 Add `elevated: true` to checks that require admin privileges. All elevated checks are batched into a single password prompt:
@@ -295,8 +362,10 @@ Add `elevated: true` to checks that require admin privileges. All elevated check
 ## Benchmark Loading Priority
 
 1. **Custom file** — `armazi scan --benchmark path/to/file.yaml`
-2. **Local overrides** — `~/.config/armazi/benchmarks/cis-macos-benchmark.yaml`
-3. **Built-in default** — embedded in the binary, always available
+2. **Local override** — `~/.config/armazi/benchmarks/<profile>.yaml`
+   (`cis-macos-benchmark.yaml` or `personal-protection-benchmark.yaml`)
+3. **Platform match** — a local file matching the detected platform, for the `cis` profile
+4. **Built-in default** — embedded in the binary, always available
 
 Use `armazi update-benchmarks` to pull the latest from GitHub into the local overrides directory.
 
@@ -310,7 +379,7 @@ Sources/
 │   ├── Models/          # CheckDefinition, CheckResult, ScanReport
 │   ├── Engine/          # BenchmarkParser, CheckRunner, ShellExecutor,
 │   │                    # SelfUpdater, BenchmarkUpdater, XCCDFImporter
-│   └── Benchmarks/      # Source YAML files
+│   └── Benchmarks/      # Source YAML files (CIS + Personal Protection)
 ├── ArmaziCLI/           # CLI (scan, status, list, update, import)
 └── Armazi/              # SwiftUI macOS GUI application
     ├── Views/           # Dashboard, category detail, report, score ring
@@ -318,6 +387,11 @@ Sources/
 ```
 
 `ArmaziCore` is a standalone library used by both the CLI and the GUI app.
+
+The YAML files under `Sources/ArmaziCore/Benchmarks/` are the source of truth;
+the same text is compiled into the binary so a downloaded release is
+self-contained. `Scripts/sync-embedded-benchmarks.py` regenerates the embedded
+copies (and `--check` fails if they drift, which CI enforces).
 
 ---
 
@@ -340,6 +414,7 @@ To report a security vulnerability, please open an issue on GitHub.
 
 ## Roadmap
 
+- [x] **Personal protection profile** — consumer check-up covering identity, data, online safety, home network, privacy, and incident readiness
 - [ ] **macOS .app bundle** — double-click to launch, Dock icon, notarization
 - [ ] **Menu bar agent** — background process showing security score in the menu bar
 - [ ] **One-click remediation** — "Fix" button in GUI that applies the recommended fix
@@ -351,6 +426,8 @@ To report a security vulnerability, please open an issue on GitHub.
 - [ ] **Windows benchmark YAMLs** — Windows 10/11 and Server
 - [ ] **DISA STIG importer** — direct import from public.cyber.mil
 - [ ] **Scheduled scans** — periodic scans with drift detection and notifications
+- [ ] **`armazi attest`** — manage the attestation file from the CLI instead of by hand
+- [ ] **Personal profile for Linux and Windows** — the same consumer check-up beyond macOS
 - [ ] **Team dashboard** — track compliance across a fleet of machines
 - [ ] **Homebrew Cask** — `brew install --cask armazi` for the GUI app
 

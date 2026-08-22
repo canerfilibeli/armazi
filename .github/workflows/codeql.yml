@@ -22,8 +22,13 @@ jobs:
       - name: Build release
         run: swift build -c release --product armazi
 
-      - name: Validate benchmark
-        run: .build/debug/armazi list
+      - name: Check embedded benchmarks are in sync with the YAML sources
+        run: python3 Scripts/sync-embedded-benchmarks.py --check
+
+      - name: Validate benchmarks
+        run: |
+          .build/debug/armazi list
+          .build/debug/armazi list --profile personal --level 2
 
   security-audit:
     name: Security Audit
