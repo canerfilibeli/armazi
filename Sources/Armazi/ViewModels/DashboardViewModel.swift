@@ -6,6 +6,14 @@ final class DashboardViewModel: ObservableObject {
     @Published var report: ScanReport?
     @Published var selectedCategory: CheckCategory?
     @Published var selectedLevel: Int = 1
+    @Published var selectedProfile: BenchmarkProfile = .default {
+        didSet {
+            guard oldValue != selectedProfile else { return }
+            report = nil
+            selectedCategory = nil
+            loadBenchmark()
+        }
+    }
     @Published var errorMessage: String?
     @Published var statusMessage: String?
     @Published var isUpdatingBenchmarks = false
@@ -24,7 +32,7 @@ final class DashboardViewModel: ObservableObject {
 
     func loadBenchmark() {
         do {
-            benchmark = try BenchmarkParser.loadBundled()
+            benchmark = try BenchmarkParser.loadBundled(profile: selectedProfile)
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription

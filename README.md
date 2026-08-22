@@ -1,6 +1,6 @@
 # Armazi
 
-**Open-source macOS security auditor** — scan your Mac against CIS Benchmarks and industry compliance frameworks.
+**Open-source macOS security auditor** — scan your Mac against CIS Benchmarks and industry compliance frameworks, plus a personal security profile covering identity, backups, safe browsing, your home network, and privacy.
 
 > **Armazi** (არმაზი) is the chief guardian deity of ancient Colchian and Georgian mythology. His statue stood at the gates of Mtskheta, the capital of the Kingdom of Iberia, watching over all who entered. Like its namesake, Armazi stands guard at the gates of your macOS system — scanning, auditing, and reporting security configurations to keep your machine safe.
 
@@ -39,9 +39,25 @@ sudo cp .build/release/armazi /usr/local/bin/
 ## Quick Start
 
 ```bash
-armazi                # run a full scan (default command)
-armazi status         # one-line security summary
+armazi                          # run a full scan (default command)
+armazi status                   # one-line security summary
+armazi scan --profile personal  # personal security, privacy & home network
+armazi scan --profile all       # everything, in one report
 ```
+
+### Profiles
+
+Armazi ships two sets of checks. They do not overlap — run `--profile all` for both.
+
+| Profile | What it covers |
+|---|---|
+| `cis` *(default)* | **System hardening** — CIS macOS Benchmark: access control, sharing services, updates, system integrity. |
+| `personal` | **Personal security** — identity & accounts, backup and recovery, safe browsing, home network, privacy. |
+| `all` | Both profiles merged into a single report. |
+
+See [docs/PERSONAL_SECURITY.md](docs/PERSONAL_SECURITY.md) for how the personal
+profile maps onto what people expect from a consumer security product, and where
+this tool deliberately stops.
 
 ---
 
@@ -58,6 +74,14 @@ armazi scan --json           # output results as JSON (for CI/CD pipelines)
 armazi scan --level 2        # use CIS Level 2 profile (stricter)
 ```
 
+**Choose a profile:**
+
+```bash
+armazi scan --profile cis        # system hardening (default)
+armazi scan --profile personal   # personal security, privacy & home network
+armazi scan --profile all        # both
+```
+
 **Filter by category:**
 
 ```bash
@@ -65,6 +89,12 @@ armazi scan --category access_security
 armazi scan --category firewall_sharing
 armazi scan --category updates
 armazi scan --category system_integrity
+
+armazi scan --profile personal --category identity_protection
+armazi scan --profile personal --category data_protection
+armazi scan --profile personal --category online_safety
+armazi scan --profile personal --category network_protection
+armazi scan --profile personal --category privacy
 ```
 
 **Run a single check:**
@@ -98,6 +128,7 @@ Quick one-line summary showing your score and category breakdown.
 ```bash
 armazi status
 armazi status --level 2
+armazi status --profile personal
 ```
 
 Example output:
@@ -122,6 +153,7 @@ List all checks in the loaded benchmark without running them.
 ```bash
 armazi list                          # list all Level 1 checks
 armazi list --level 2                # include Level 2 checks
+armazi list --profile personal       # list the personal security checks
 armazi list --benchmark custom.yaml  # list checks from a custom file
 ```
 
@@ -166,7 +198,7 @@ armazi import benchmark.xml --install   # convert and install for immediate use
 
 ## What It Checks
 
-Ships with a built-in **CIS macOS Benchmark** covering 27 checks across four categories:
+The default `cis` profile ships with a built-in **CIS macOS Benchmark** covering 27 checks across four categories:
 
 ### Access Security (9 checks)
 
@@ -214,6 +246,81 @@ Ships with a built-in **CIS macOS Benchmark** covering 27 checks across four cat
 | Terminal secure keyboard entry | Prevent keystroke interception |
 | Time Machine encrypted | Secure backups |
 | Wi-Fi connection secure | WPA2/WPA3 encryption |
+
+---
+
+## Personal Security Profile
+
+`armazi scan --profile personal` runs a second, consumer-focused benchmark of
+**33 checks** across five categories. It covers what a personal security product
+is expected to handle — identity, backups, safe browsing, the home network, and
+privacy — without repeating anything in the CIS profile.
+
+### Identity & Accounts (6 checks)
+
+| Check | Description |
+|---|---|
+| Authenticator app is available | Use app-based multi-factor authentication instead of SMS codes, which can be intercepted by SIM-swap attacks |
+| Hardware security key is present | Hardware keys (FIDO2/WebAuthn) are phishing-resistant — a fake login page cannot replay them |
+| Signed in to an Apple Account | An Apple Account is what enables Find My, iCloud Keychain, and Apple's compromised-password alerts |
+| iCloud Keychain password syncing is on | Syncing passwords keeps them available across devices and turns on Apple's alerts for passwords found in known data leaks |
+| Guest account is disabled | The guest account allows anyone with physical access to use the Mac without credentials |
+| Password hints are disabled | Password hints leak information about your password to anyone at the login window |
+
+### Device & Data (10 checks)
+
+| Check | Description |
+|---|---|
+| Find My Mac is enabled | Find My is what makes remote locate, lock, and erase possible if the Mac is lost or stolen |
+| A backup has run in the last 7 days | A backup destination that has not run recently will not get your files back after ransomware, theft, or drive failure |
+| Versioned cloud storage is in use | Cloud storage with version history lets you roll individual files back after corruption, accidental deletion, or ransomware |
+| Malware definitions are recent | XProtect carries Apple's malware signatures |
+| Security responses install automatically | Rapid Security Responses and system data files patch actively exploited flaws between full macOS releases |
+| No pending macOS updates | Reports updates macOS has already found but not installed |
+| Installed apps are up to date | Third-party apps and their plugins are patched on their own schedule — Homebrew is the most common way to keep them current on macOS |
+| Endpoint protection is active | Reports what is actually defending this Mac against malware — Apple's built-in XProtect, a third-party agent, or both |
+| Mounted external volumes are encrypted | An unencrypted backup or scratch disk hands over every file on it if the drive is lost, and makes secure disposal impossible |
+| Local snapshots are available for rollback | Time Machine local snapshots let you roll the whole system back to a point before files were encrypted or corrupted |
+
+### Online Safety (7 checks)
+
+| Check | Description |
+|---|---|
+| Safari warns about fraudulent websites | Safari's fraudulent-site warning blocks known phishing and scam pages before they load |
+| Safari does not auto-open downloads | Auto-opening 'safe' downloads lets a malicious archive or disk image run its payload the moment it lands |
+| Chrome Safe Browsing is on | Safe Browsing blocks known phishing, scam, and malware sites in Chrome |
+| Ad and tracker blocking is in place | Most consumer malware and scams arrive through malicious ads and tracking scripts |
+| A filtering DNS resolver is configured | A filtering resolver blocks malware, phishing, and tracker domains for every app on the Mac, not just the browser |
+| A VPN is configured | A VPN protects traffic on public and untrusted Wi-Fi, where anyone on the same network can watch unencrypted connections |
+| Remembered Wi-Fi network list is small | Every remembered network is one your Mac will re-join automatically |
+
+### Home Network (4 checks)
+
+| Check | Description |
+|---|---|
+| Router has no legacy admin services open | Telnet and FTP on a home router are unauthenticated or cleartext, and are a common way routers get taken over |
+| Home network device inventory | Lists the devices your Mac can currently see on the local network, so unfamiliar ones stand out |
+| No unexpected services listening on the network | Anything listening on a non-loopback address is reachable by every other device on the network, including compromised IoT devices |
+| No unexpected web proxy is configured | A proxy silently inserted into your network settings can read and modify traffic — a common trait of adware and MITM tooling |
+
+### Privacy (6 checks)
+
+| Check | Description |
+|---|---|
+| Personalized ads are off | Apple's personalized advertising builds a profile from your App Store, Apple News, and Stocks activity |
+| Analytics sharing with Apple is off | Diagnostic submissions can contain fragments of documents, URLs, and crash data from the apps you use |
+| Siri and Dictation data sharing is off | Opting in sends audio recordings and transcripts of your requests to Apple for review |
+| Location Services state is known | Location is what makes Find My work, and also what lets apps build a movement history |
+| Computer name does not reveal your identity | The computer name is broadcast over AirDrop, Bonjour, and every network you join — including public Wi-Fi |
+| Encrypted messaging is available | End-to-end encrypted messaging keeps conversations and shared files private in transit and on the provider's servers |
+
+Many of these settings live in sandboxed preference domains or depend on optional
+tooling. A check that cannot determine the answer reports `UNKNOWN` and surfaces
+as a **warning to review** rather than a failure, so only checks with an
+unambiguous system-level answer count against the score.
+
+Full mapping of customer expectations to coverage — including what is deliberately
+out of scope — is in [docs/PERSONAL_SECURITY.md](docs/PERSONAL_SECURITY.md).
 
 ---
 
@@ -307,17 +414,26 @@ Use `armazi update-benchmarks` to pull the latest from GitHub into the local ove
 ```
 Sources/
 ├── ArmaziCore/          # Shared library
-│   ├── Models/          # CheckDefinition, CheckResult, ScanReport
-│   ├── Engine/          # BenchmarkParser, CheckRunner, ShellExecutor,
-│   │                    # SelfUpdater, BenchmarkUpdater, XCCDFImporter
-│   └── Benchmarks/      # Source YAML files
+│   ├── Models/          # CheckDefinition, CheckResult, ScanReport,
+│   │                    # CheckCategory, BenchmarkProfile
+│   ├── Engine/          # BenchmarkParser, BenchmarkRegistry, CheckRunner,
+│   │                    # ShellExecutor, SelfUpdater, BenchmarkUpdater,
+│   │                    # XCCDFImporter, EmbeddedBenchmarks (generated)
+│   └── Benchmarks/      # Source YAML files — cis-macos, personal-macos
 ├── ArmaziCLI/           # CLI (scan, status, list, update, import)
 └── Armazi/              # SwiftUI macOS GUI application
     ├── Views/           # Dashboard, category detail, report, score ring
     └── ViewModels/      # DashboardViewModel
+
+Scripts/
+└── embed-benchmarks.sh  # regenerates EmbeddedBenchmarks.swift from the YAML
 ```
 
 `ArmaziCore` is a standalone library used by both the CLI and the GUI app.
+
+Benchmarks are embedded in the binary as string literals. After editing anything
+in `Sources/ArmaziCore/Benchmarks/`, run `./Scripts/embed-benchmarks.sh` to
+regenerate `EmbeddedBenchmarks.swift` (`--check` verifies it is up to date).
 
 ---
 
@@ -354,6 +470,16 @@ To report a security vulnerability, please open an issue on GitHub.
 - [ ] **Team dashboard** — track compliance across a fleet of machines
 - [ ] **Homebrew Cask** — `brew install --cask armazi` for the GUI app
 
+Personal security profile ([details](docs/PERSONAL_SECURITY.md)):
+
+- [x] **Personal security profile** — identity, backups, browsing, home network, privacy
+- [ ] **Breach lookup** — `armazi breach` against the Have I Been Pwned range API (k-anonymity, nothing leaves the machine in the clear)
+- [ ] **Weighted risk score** — a failed FileVault check should not cost the same as a missing ad blocker
+- [ ] **New-device alerts** — remember the home network between scans and flag devices that appear
+- [ ] **Monthly health report** — scheduled scan plus an exported summary of what changed
+- [ ] **Family coverage** — multiple machines and accounts under one report
+- [ ] **Incident playbook** — offline first-steps guidance for a hacked account or stolen device
+
 ---
 
 ## Contributing
@@ -361,9 +487,11 @@ To report a security vulnerability, please open an issue on GitHub.
 Contributions are welcome. The easiest way to contribute is by adding or improving checks in the benchmark YAML file — no Swift knowledge required.
 
 1. Fork the repository
-2. Edit `Sources/ArmaziCore/Benchmarks/cis-macos-benchmark.yaml`
+2. Edit `Sources/ArmaziCore/Benchmarks/cis-macos-benchmark.yaml` (system hardening) or
+   `personal-macos-benchmark.yaml` (personal security)
 3. Test the audit command in Terminal first
-4. Submit a pull request
+4. Run `./Scripts/embed-benchmarks.sh` so the embedded copy matches
+5. Submit a pull request
 
 See [Development_Guide.md](Development_Guide.md) for build instructions and coding conventions.
 

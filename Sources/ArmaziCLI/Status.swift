@@ -6,12 +6,15 @@ struct Status: AsyncParsableCommand {
         abstract: "Quick status summary of your system security."
     )
 
+    @Option(name: .shortAndLong, help: ArgumentHelp(BenchmarkProfile.optionHelp))
+    var profile: String = BenchmarkProfile.default.rawValue
+
     @Option(name: .shortAndLong, help: "CIS profile level (1 or 2).")
     var level: Int = 1
 
     func run() async throws {
         await ArmaziCLI.checkForUpdates()
-        let benchmark = try BenchmarkParser.loadBundled()
+        let benchmark = try BenchmarkParser.loadBundled(profile: BenchmarkProfile.resolve(profile))
         let runner = CheckRunner()
         let report = await runner.run(benchmark: benchmark, level: level)
 
@@ -22,7 +25,7 @@ struct Status: AsyncParsableCommand {
 
         print()
         print("  \(CLIReporter.bold)Armazi Security Status\(CLIReporter.reset)")
-        print("  \(CLIReporter.dim)\(platform)\(CLIReporter.reset)")
+        print("  \(CLIReporter.dim)\(platform) — \(benchmark.name)\(CLIReporter.reset)")
         print()
         print("  \(scoreColor)\(CLIReporter.bold)\(score)%\(CLIReporter.reset) \(CLIReporter.dim)— \(report.passCount) passed, \(report.failCount) failed out of \(report.totalChecks) checks\(CLIReporter.reset)")
         print()

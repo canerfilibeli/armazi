@@ -14,6 +14,7 @@ struct DashboardView: View {
         .navigationTitle("Armazi")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
+                profilePicker
                 levelPicker
                 updateBenchmarksButton
                 importMenu
@@ -183,6 +184,17 @@ struct DashboardView: View {
     }
 
     // MARK: - Toolbar
+
+    private var profilePicker: some View {
+        Picker("Profile", selection: $viewModel.selectedProfile) {
+            ForEach(BenchmarkProfile.allCases) { profile in
+                Text(profile.displayName).tag(profile)
+            }
+        }
+        .pickerStyle(.menu)
+        .frame(width: 170)
+        .help(viewModel.selectedProfile.summary)
+    }
 
     private var levelPicker: some View {
         Picker("Level", selection: $viewModel.selectedLevel) {

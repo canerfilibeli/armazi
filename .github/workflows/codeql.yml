@@ -16,14 +16,23 @@ jobs:
       - name: Swift version
         run: swift --version
 
+      - name: Verify embedded benchmarks are in sync
+        run: ./Scripts/embed-benchmarks.sh --check
+
       - name: Build all targets
         run: swift build
+
+      - name: Run tests
+        run: swift test
 
       - name: Build release
         run: swift build -c release --product armazi
 
-      - name: Validate benchmark
-        run: .build/debug/armazi list
+      - name: Validate benchmarks
+        run: |
+          .build/debug/armazi list
+          .build/debug/armazi list --profile personal --level 2
+          .build/debug/armazi list --profile all --level 2
 
   security-audit:
     name: Security Audit

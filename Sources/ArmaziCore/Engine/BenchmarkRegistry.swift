@@ -73,6 +73,70 @@ public enum BenchmarkRegistry {
         ],
     ]
 
+    /// Load a bundled profile: the platform's hardening benchmark, the personal
+    /// security benchmark, or both merged into one definition.
+    public static func load(profile: BenchmarkProfile) throws -> BenchmarkDefinition {
+        switch profile {
+        case .cis:
+            return try loadForCurrentPlatform()
+        case .personal:
+            return try loadPersonal()
+        case .all:
+            let hardening = try loadForCurrentPlatform()
+            let personal = try loadPersonal()
+            return merge(
+                [hardening, personal],
+                name: "Armazi Full Profile",
+                description: "\(hardening.name) and \(personal.name) combined."
+            )
+        }
+    }
+
+    /// Load the consumer-focused personal security benchmark.
+    /// Priority: local override → embedded default.
+    public static func loadPersonal() throws -> BenchmarkDefinition {
+        let localFile = BenchmarkParser.localDir
+            .appendingPathComponent("personal-macos-benchmark.yaml")
+        if FileManager.default.fileExists(atPath: localFile.path) {
+            return try BenchmarkParser.parse(fileURL: localFile)
+        }
+
+        let platform = Platform.detect()
+        guard platform.os == .macOS else {
+            throw BenchmarkError.bundledFileNotFound(
+                "The personal security profile is macOS-only for now (detected \(platform.description))."
+            )
+        }
+
+        return try BenchmarkParser.parse(yaml: EmbeddedBenchmarks.personalMacOS)
+    }
+
+    /// Combine benchmarks into a single definition, keeping the first
+    /// occurrence of any check ID that appears more than once.
+    public static func merge(
+        _ benchmarks: [BenchmarkDefinition],
+        name: String,
+        description: String
+    ) -> BenchmarkDefinition {
+        var seen: Set<String> = []
+        var checks: [CheckDefinition] = []
+        for benchmark in benchmarks {
+            for check in benchmark.checks {
+                if seen.contains(check.id) { continue }
+                seen.insert(check.id)
+                checks.append(check)
+            }
+        }
+
+        return BenchmarkDefinition(
+            name: name,
+            version: benchmarks.map(\.version).joined(separator: "+"),
+            platform: benchmarks.first?.platform ?? Platform.detect().os.rawValue,
+            description: description,
+            checks: checks
+        )
+    }
+
     /// Get the best benchmark for the current platform.
     public static func loadForCurrentPlatform() throws -> BenchmarkDefinition {
         let platform = Platform.detect()

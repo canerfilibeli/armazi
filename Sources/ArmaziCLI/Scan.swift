@@ -10,6 +10,9 @@ struct Scan: AsyncParsableCommand {
     @Option(name: .shortAndLong, help: "Path to a custom benchmark YAML file.")
     var benchmark: String?
 
+    @Option(name: .shortAndLong, help: ArgumentHelp(BenchmarkProfile.optionHelp))
+    var profile: String = BenchmarkProfile.default.rawValue
+
     @Option(name: .shortAndLong, help: "CIS profile level (1 or 2).")
     var level: Int = 1
 
@@ -19,7 +22,7 @@ struct Scan: AsyncParsableCommand {
     @Flag(name: .long, help: "Output results as JSON.")
     var json: Bool = false
 
-    @Option(name: .shortAndLong, help: "Run only checks matching this category (access_security, firewall_sharing, updates, system_integrity).")
+    @Option(name: .shortAndLong, help: "Run only checks matching this category (run 'armazi list' to see the names in each profile).")
     var category: String?
 
     @Option(name: .long, help: "Run only a specific check by ID.")
@@ -43,7 +46,7 @@ struct Scan: AsyncParsableCommand {
         if let path = benchmark {
             benchmarkDef = try BenchmarkParser.parse(fileURL: URL(fileURLWithPath: path))
         } else {
-            benchmarkDef = try BenchmarkParser.loadBundled()
+            benchmarkDef = try BenchmarkParser.loadBundled(profile: BenchmarkProfile.resolve(profile))
         }
 
         if watch {

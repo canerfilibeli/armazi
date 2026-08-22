@@ -11,6 +11,9 @@ struct ListChecks: AsyncParsableCommand {
     @Option(name: .shortAndLong, help: "Path to a custom benchmark YAML file.")
     var benchmark: String?
 
+    @Option(name: .shortAndLong, help: ArgumentHelp(BenchmarkProfile.optionHelp))
+    var profile: String = BenchmarkProfile.default.rawValue
+
     @Option(name: .shortAndLong, help: "CIS profile level (1 or 2).")
     var level: Int = 1
 
@@ -19,7 +22,7 @@ struct ListChecks: AsyncParsableCommand {
         if let path = benchmark {
             benchmarkDef = try BenchmarkParser.parse(fileURL: URL(fileURLWithPath: path))
         } else {
-            benchmarkDef = try BenchmarkParser.loadBundled()
+            benchmarkDef = try BenchmarkParser.loadBundled(profile: BenchmarkProfile.resolve(profile))
         }
 
         let total = benchmarkDef.checks.filter { $0.level <= level }.count
